@@ -1,0 +1,12 @@
+# Python environment -- recreate with: python3 -m venv .venv
+.venv/
+
+# Downloaded open-data cache (45 MB). stormwater.py re-downloads it on first run.
+cache/
+
+# Generated outputs. Too large for GitHub and reproducible from stormwater.py.
+r11_stormwater.geojson
+r11_stormwater_summary.csv
+
+# macOS
+.DS_Store
