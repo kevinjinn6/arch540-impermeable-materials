@@ -10,3 +10,10 @@ r11_stormwater_summary.csv
 
 # macOS
 .DS_Store
+
+# Python bytecode, created whenever the tool or its tests run
+__pycache__/
+
+# Stage 2 outputs, reproducible from buildings.py (153 MB + 52 MB)
+r11_stage2.geojson
+map/data/
