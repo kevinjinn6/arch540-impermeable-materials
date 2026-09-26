@@ -1,0 +1,587 @@
+<!doctype html>
+<!--
+================================================================================
+ R1-1 HARD SURFACE MAP  --  Stage 2, Part 2
+================================================================================
+
+WHAT THIS PAGE SHOWS
+  Every ordinary R1-1 lot in Vancouver, coloured by how much of it is hard
+  surface (roofs plus paving). One slider moves every lot, left to right,
+  from "Bylaw today" (the s.3.2.2.8 limit, 75%) through "Meets Rain City"
+  (the most hard surface the 48 mm storm allows) to "No paving (roofs only)"
+  (only the buildings are hard). Each step right means less hard surface, so
+  the map gets bluer. The summary counts how many lots handle the storm at
+  the slider's position.
+
+HOW TO OPEN IT
+  It needs a tiny local web server (a browser won't load the data file
+  straight from disk). In a terminal, from the project folder:
+       python3 buildings.py              (once, to make map/data/lots.geojson)
+       cd map
+       python3 -m http.server
+  then open  http://localhost:8000  in a browser.
+
+TO CHANGE THE NUMBERS
+  Everything is in the CONFIGURATION block inside the <script> near the
+  bottom of this file. You should not need to touch anything below the line
+  "END OF CONFIGURATION".
+
+WHERE THE DATA COMES FROM
+  map/data/lots.geojson is written by buildings.py. For each lot it holds
+  only the site area (A) and the roof area (r); every other number on this
+  page is worked out here from those two and the CONFIGURATION values.
+================================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R1-1 Hard Surface Map</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<!-- earcut cuts each lot outline into triangles, which is what the graphics
+     card draws. -->
+<script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
+<style>
+  /* Colours for the page itself (not the lots -- those are in CONFIGURATION). */
+  :root {
+    --surface: #fcfcfb;
+    --ink: #1f1f1d;
+    --ink-2: #55544f;
+    --ink-3: #85847e;
+    --rule: #e2e1dc;
+    --accent: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #b9b8b2;
+      --ink-3: #8a8983;
+      --rule: #383835;
+      --accent: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #1a1a19; --ink: #f0efec; --ink-2: #b9b8b2;
+    --ink-3: #8a8983; --rule: #383835; --accent: #3987e5;
+  }
+
+  html, body { margin: 0; height: 100%; background: var(--surface); color: var(--ink);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #map { position: absolute; inset: 0; }
+
+  /* The one panel: title, slider, summary, legend, notes. */
+  #panel {
+    position: absolute; top: 12px; left: 12px; width: 340px;
+    max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,.12);
+  }
+  @media (max-width: 520px) {
+    #panel { top: auto; bottom: 0; left: 0; width: 100%; max-height: 55%;
+      border-radius: 8px 8px 0 0; }
+  }
+  h1 { font-size: 16px; margin: 0 0 2px; }
+  .sub { color: var(--ink-2); font-size: 12px; margin: 0 0 14px; }
+
+  .readout { display: flex; justify-content: space-between; align-items: baseline; }
+  .readout b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .position { color: var(--ink-2); font-size: 12px; min-height: 17px; }
+
+  input[type=range] { width: 100%; margin: 10px 0 2px; accent-color: var(--accent); }
+  .stops { position: relative; height: 30px; font-size: 11px; color: var(--ink-2); }
+  .stops button { position: absolute; transform: translateX(-50%); background: none;
+    border: 0; padding: 2px 0; color: inherit; font: inherit; cursor: pointer;
+    text-align: center; line-height: 1.2; white-space: nowrap; }
+  .stops button:hover { color: var(--ink); text-decoration: underline; }
+  .stops button:first-child { transform: none; text-align: left; }
+  .stops button:last-child { transform: translateX(-100%); text-align: right; }
+
+  .summary { margin: 14px 0; padding: 12px 0; border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule); }
+  .big { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .summary .row { display: flex; gap: 16px; }
+  .summary .row > div { flex: 1; }
+  .label { color: var(--ink-2); font-size: 12px; }
+  .blocked { margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+
+  .legend .bar { height: 12px; border-radius: 3px; margin: 6px 0 0; }
+  .legend .ticks { position: relative; height: 30px; font-size: 11px; color: var(--ink-2); }
+  .legend .ticks span { position: absolute; transform: translateX(-50%);
+    white-space: nowrap; text-align: center; line-height: 1.2; padding-top: 4px; }
+  .legend .ticks span::before { content: ""; position: absolute; top: -4px; left: 50%;
+    width: 1px; height: 6px; background: var(--ink-2); }
+  .legend .ticks span.edge-l { transform: none; }
+  .legend .ticks span.edge-l::before { left: 0; }
+  .legend .ticks span.edge-r { transform: translateX(-100%); }
+  .legend .ticks span.edge-r::before { left: auto; right: 0; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px;
+    vertical-align: -2px; margin-right: 6px; }
+
+  .notes { margin: 14px 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--ink-3); }
+  .notes li { margin: 0 0 3px; }
+  #cityBtn { margin-top: 12px; width: 100%; padding: 7px; border-radius: 6px;
+    border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+    font: inherit; cursor: pointer; }
+  #cityBtn:hover { border-color: var(--ink-3); }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--ink-2); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="loading">Loading about 62,000 lots&hellip;</div>
+
+<div id="panel">
+  <h1>How much of each R1-1 lot is hard surface?</h1>
+  <p class="sub" id="subtitle"></p>
+
+  <div class="readout">
+    <span>Hard surface: <b id="hsPct">&ndash;</b></span>
+    <span class="label">average, all lots</span>
+  </div>
+  <div class="position" id="position"></div>
+  <input type="range" id="slider" min="0" max="2" step="0.001" value="0" disabled
+         aria-label="Hard surface on every lot">
+  <div class="stops">
+    <button data-t="0" style="left:0%">Bylaw<br>today</button>
+    <button data-t="1" style="left:50%">Meets<br>Rain City</button>
+    <button data-t="2" style="left:100%">No paving<br>(roofs only)</button>
+  </div>
+
+  <div class="summary">
+    <div class="row">
+      <div><div class="big" id="passN">&ndash;</div>
+           <div class="label">lots handle the 48&nbsp;mm storm</div></div>
+      <div><div class="big" id="failN">&ndash;</div>
+           <div class="label">lots do not</div></div>
+    </div>
+    <div class="blocked" id="blocked"></div>
+  </div>
+
+  <div class="legend">
+    <div class="label">Colour = hard surface as a share of the lot.
+      Blue handles the storm; red does not.</div>
+    <div class="bar" id="legendBar"></div>
+    <div class="ticks" id="legendTicks"></div>
+    <div class="label"><span class="swatch" id="greySwatch"></span>Outside scope: large sites over 2,000&nbsp;m&sup2;, and road allowances</div>
+    <div class="label"><span class="swatch" id="roofSwatch"></span>Building &mdash; always hard surface (2015; zoom in to see)</div>
+  </div>
+
+  <button id="cityBtn">Zoom out to the whole city</button>
+
+  <ul class="notes" id="notes"></ul>
+</div>
+
+<script>
+// =============================================================================
+//  CONFIGURATION  --  change these numbers, not the code below
+// =============================================================================
+
+// ---- Rainfall and soil (same meaning as in buildings.py) -------------------
+const DESIGN_RAINFALL_MM = 48;    // Rain City daily standard: mm in 24 hours
+const RUNOFF_COEFF = 0.85;        // share of rain that runs off hard surfaces
+const D_EFF_MM = 75;              // soil holding depth: mm of water the
+                                  // permeable ground holds before it sheds.
+                                  //   30 = compacted lawn   48 = break-even
+                                  //   75 = good soil       285 = rain garden
+const SOIL_NAME = "good soil";    // how D_EFF_MM is described on the page
+
+// ---- The by-law ------------------------------------------------------------
+const BYLAW_IMPERMEABLE_RATIO = 0.75;
+// s.3.2.2.8: impermeable materials may cover at most 75% of the site.
+// This is the "Bylaw today" stop on the slider.
+
+// ---- Colours for the lots --------------------------------------------------
+// One scale, split at the Rain City limit:
+//   blue = at or under the limit -- the lot handles the storm. Darker blue
+//          means more room to spare.
+//   red  = over the limit -- the lot does not. Darker red means further over.
+// The colour flips from blue to red exactly at the limit, so pass and fail
+// can never be confused, and no lot is ever drawn grey (grey means "outside
+// scope" only).
+const COLOR_NONE = "#104281";     // 0% hard surface
+const COLOR_AT_LIMIT = "#3987e5"; // exactly at the limit (still passing)
+const COLOR_OVER = "#e34948";     // just over the limit
+const COLOR_FULL = "#8f1d1d";     // 100% hard surface
+const COLOR_OUT = "#b9b8b2";      // outside scope (large sites, rights-of-way)
+const BUILDING_FILL = "#3d3d3a";  // roofs: always hard surface, whatever the
+                                  // slider says, so they keep one fixed colour.
+                                  // Not red -- red means "this lot fails".
+const BUILDING_FILL_DARK = "#6b6a65"; // the same, when your computer is in dark mode
+const LOT_OPACITY = 0.85;         // 1 = solid; lower lets the street map show
+
+// ---- Where the map opens ---------------------------------------------------
+// The 1300 block of E 17th Ave: the nearest R1-1 block to 1349 E 13th Ave,
+// which is zoned RT-5 and so is not on this map.
+const OPEN_AT = { center: [-123.07530, 49.25520], zoom: 16.5 };
+const CITY_BOUNDS = [[-123.2245, 49.1985], [-123.0236, 49.2951]];
+
+const DATA_FILE = "data/lots.geojson";
+const BUILDINGS_FILE = "data/buildings.geojson";   // 2015 building outlines
+const BUILDINGS_MIN_ZOOM = 14;    // outlines appear from this zoom in (city = ~11)
+
+// =============================================================================
+//  END OF CONFIGURATION
+// =============================================================================
+
+
+// ---- The water balance ------------------------------------------------------
+// The permeable ground must hold the rain on itself plus the runoff from the
+// hard part:   Perm x D  >=  Perm x P  +  Hard x P x C
+// Solving for the most hard surface allowed, as a SHARE of the lot:
+//   limit = 1 - P x C / (D - P + P x C)
+// It is the same share for every lot, because both sides scale with lot area.
+// When D is less than P the soil cannot even hold the rain that falls on it,
+// so no lot can pass: limit = null.
+const P = DESIGN_RAINFALL_MM, C = RUNOFF_COEFF, D = D_EFF_MM;
+const RAIN_LIMIT = D >= P ? Math.max(0, 1 - (P * C) / (D - P + P * C)) : null;
+const LIMIT = RAIN_LIMIT === null ? 0 : RAIN_LIMIT;   // for drawing only
+
+// ---- How the slider moves each lot -----------------------------------------
+// Slider position t runs 0 -> 1 -> 2 through the three named stops, from the
+// most hard surface to the least, so the map gets bluer left to right:
+//   t = 0  Bylaw today      hard surface = 75% of the lot
+//   t = 1  Meets Rain City  hard surface = RAIN_LIMIT of the lot
+//   t = 2  No paving        hard surface = the lot's roofs, nothing else
+// Between stops each lot moves in a straight line. Hard surface can never be
+// less than the roofs, so a lot whose roofs already exceed a stop stays at
+// its roof share there. A lot whose roofs exceed RAIN_LIMIT can never pass.
+function roofShare(A, r) { return Math.min(1, r / A); }
+function hardShare(rs, t) {
+  const bylaw = Math.max(BYLAW_IMPERMEABLE_RATIO, rs);
+  const meets = Math.max(RAIN_LIMIT === null ? 0 : RAIN_LIMIT, rs);
+  return t <= 1 ? bylaw + (meets - bylaw) * t : meets + (rs - meets) * (t - 1);
+}
+function passes(h) { return RAIN_LIMIT !== null && h <= RAIN_LIMIT + 1e-9; }
+
+// The map colours each lot with the same rule, run on the graphics card:
+// see LOT_SHADER below. If you change hardShare(), change it there too.
+
+// ---- Page text that depends on the configuration ---------------------------
+const pct = x => (x * 100).toFixed(1) + "%";
+document.getElementById("subtitle").textContent =
+  `Ordinary R1-1 lots, Vancouver. Soil holds ${D} mm (${SOIL_NAME}), so the ` +
+  (RAIN_LIMIT === null
+    ? `48 mm storm cannot be handled at any amount of hard surface.`
+    : `48 mm storm allows at most ${pct(RAIN_LIMIT)} hard surface.`);
+const notes = [
+  "Buildings: 2015 City data, may be out of date.",
+  "‘No paving’ counts roofs only — real lots also have driveways and patios.",
+  "Roof outlines include eaves, so roof area is a slight overestimate.",
+  "Parcels sharing an address and adjoining are treated as one zoning site, per the Section 2 definition of Site.",
+  "Rain City’s 48 mm is a City target, not a legal requirement for R1-1.",
+];
+document.getElementById("notes").innerHTML = notes.map(n => `<li>${n}</li>`).join("");
+
+// Legend: the same colours as the map, drawn as a bar, with the limits marked.
+const Lp = LIMIT * 100;
+document.getElementById("legendBar").style.background = RAIN_LIMIT === null
+  ? `linear-gradient(to right, ${COLOR_OVER}, ${COLOR_FULL})`
+  : `linear-gradient(to right, ${COLOR_NONE} 0%, ${COLOR_AT_LIMIT} ${Lp}%, ` +
+    `${COLOR_OVER} ${Lp}%, ${COLOR_FULL} 100%)`;
+document.getElementById("greySwatch").style.background = COLOR_OUT;
+document.getElementById("roofSwatch").style.background =
+  matchMedia("(prefers-color-scheme: dark)").matches ? BUILDING_FILL_DARK : BUILDING_FILL;
+const ticks = [[0, "0%", "edge-l"], [1, "100%", "edge-r"],
+               [BYLAW_IMPERMEABLE_RATIO, `Bylaw<br>${pct(BYLAW_IMPERMEABLE_RATIO)}`, ""]];
+if (RAIN_LIMIT !== null)
+  ticks.push([RAIN_LIMIT, `Rain City limit<br>${pct(RAIN_LIMIT)}`, ""]);
+document.getElementById("legendTicks").innerHTML = ticks.map(([v, t, c]) =>
+  `<span class="${c}" style="left:${v * 100}%">${t}</span>`).join("");
+
+
+// ---- The map ------------------------------------------------------------------
+// Basemap: OpenFreeMap's plain street map (light or dark to match your
+// computer). Free, and needs no API key. The lots are drawn above its roads
+// and below its street names, so names stay readable.
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+const BASEMAP = `https://tiles.openfreemap.org/styles/${dark ? "dark" : "positron"}`;
+const map = new maplibregl.Map({
+  container: "map", style: BASEMAP,
+  center: OPEN_AT.center, zoom: OPEN_AT.zoom,
+  pitch: 0, maxPitch: 0, dragRotate: false, touchPitch: false,   // flat 2D map
+  antialias: true,                                                // smooth lot edges
+});
+map.touchZoomRotate.disableRotation();
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+// ---- Drawing the lots on the graphics card -----------------------------------
+// WHY: the slider has to feel instant. Asking MapLibre to recolour 62,000
+// lots means it rebuilds its map tiles each time (about 0.3 s, more when
+// zoomed out). Instead, every lot is sent to the graphics card ONCE, with its
+// roof share, and the colour is worked out there from the slider position.
+// Moving the slider then only changes one number (u_t), so every lot
+// recolours on the very next frame, at any zoom.
+//
+// The code below is the colour rule written in the graphics card's language
+// (GLSL). It is the same rule as hardShare() and passes() above.
+const LOT_SHADER = {
+  vertex: `
+    attribute vec2 a_pos;      // lot corner, in map units, relative to ORIGIN
+    attribute float a_rs;      // the lot's roof share, 0-1
+    attribute float a_sc;      // 0 = ordinary lot, anything else = outside scope
+    uniform mat4 u_matrix;     // where the map camera is
+    uniform float u_t;         // the slider, 0 -> 1 -> 2
+    uniform float u_bylaw, u_limit, u_hasLimit, u_opacity;
+    uniform vec3 u_none, u_atLimit, u_over, u_full, u_out;
+    varying vec4 v_color;
+    void main() {
+      gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+      vec3 c;
+      if (a_sc > 0.5) {
+        c = u_out;                                   // outside scope: grey
+      } else {
+        float bylaw = max(u_bylaw, a_rs);            // never below the roofs
+        float meets = max(u_limit, a_rs);
+        float h = u_t <= 1.0 ? bylaw + (meets - bylaw) * u_t
+                             : meets + (a_rs - meets) * (u_t - 1.0);
+        if (u_hasLimit > 0.5 && h <= u_limit + 1e-6)
+          c = mix(u_none, u_atLimit, clamp(h / max(u_limit, 1e-3), 0.0, 1.0));
+        else
+          c = mix(u_over, u_full, clamp((h - u_limit) / max(1.0 - u_limit, 1e-3), 0.0, 1.0));
+      }
+      v_color = vec4(c * u_opacity, u_opacity);      // pre-multiplied, as MapLibre expects
+    }`,
+  fragment: `
+    precision mediump float;
+    varying vec4 v_color;
+    void main() { gl_FragColor = v_color; }`,
+};
+
+const hexToRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+
+// Map units ("Web Mercator", 0-1 across the world). Lot corners are stored
+// relative to a point in the middle of Vancouver: small numbers keep their
+// full precision on the graphics card, so lots don't wobble when zoomed in.
+const ORIGIN = maplibregl.MercatorCoordinate.fromLngLat([-123.12, 49.25]);
+
+function buildLotMesh(features) {
+  const verts = [], idx = [];                // 4 numbers per corner: x, y, rs, sc
+  for (const f of features) {
+    const p = f.properties;
+    const rs = p.sc === 0 ? roofShare(p.A, p.r) : 0;
+    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates]
+                : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+    for (const rings of polys) {
+      const flat = [], holes = [];
+      rings.forEach((ring, i) => {
+        if (i > 0) holes.push(flat.length / 2);
+        for (const [lng, lat] of ring) {
+          const m = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]);
+          flat.push(m.x - ORIGIN.x, m.y - ORIGIN.y);
+        }
+      });
+      const base = verts.length / 4;
+      for (let i = 0; i < flat.length; i += 2) verts.push(flat[i], flat[i + 1], rs, p.sc);
+      for (const k of earcut(flat, holes)) idx.push(base + k);
+    }
+  }
+  return { verts: new Float32Array(verts), idx: new Uint32Array(idx) };
+}
+
+function lotLayer(mesh) {
+  let prog, vbo, ibo, vao, loc = {}, gl2;
+  const compile = (gl, type, src) => {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  };
+  return {
+    id: "lots", type: "custom", renderingMode: "2d",
+    onAdd(map, gl) {
+      gl2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+      if (!gl2) gl.getExtension("OES_element_index_uint");
+      const vaoExt = gl2 ? null : gl.getExtension("OES_vertex_array_object");
+      const newVAO = () => gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
+      this.bindVAO = v => gl2 ? gl.bindVertexArray(v) : vaoExt.bindVertexArrayOES(v);
+
+      prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, LOT_SHADER.vertex));
+      gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
+      gl.linkProgram(prog);
+      for (const u of ["u_matrix", "u_t", "u_bylaw", "u_limit", "u_hasLimit", "u_opacity",
+                       "u_none", "u_atLimit", "u_over", "u_full", "u_out"])
+        loc[u] = gl.getUniformLocation(prog, u);
+
+      // Our own "vertex array" so we never disturb MapLibre's drawing state.
+      vao = newVAO(); this.bindVAO(vao);
+      vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
+      ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.idx, gl.STATIC_DRAW);
+      [["a_pos", 2, 0], ["a_rs", 1, 8], ["a_sc", 1, 12]].forEach(([name, size, offset]) => {
+        const a = gl.getAttribLocation(prog, name);
+        gl.enableVertexAttribArray(a);
+        gl.vertexAttribPointer(a, size, gl.FLOAT, false, 16, offset);
+      });
+      this.bindVAO(null);
+    },
+    render(gl, matrix) {
+      // Fold ORIGIN back into the camera matrix (in full precision, here in
+      // JavaScript) so the small stored numbers land in the right place.
+      const m = Array.from(matrix);
+      for (let r = 0; r < 4; r++) m[12 + r] += ORIGIN.x * m[r] + ORIGIN.y * m[4 + r];
+      gl.useProgram(prog);
+      gl.uniformMatrix4fv(loc.u_matrix, false, m);
+      gl.uniform1f(loc.u_t, +slider.value);
+      gl.uniform1f(loc.u_bylaw, BYLAW_IMPERMEABLE_RATIO);
+      gl.uniform1f(loc.u_limit, LIMIT);
+      gl.uniform1f(loc.u_hasLimit, RAIN_LIMIT === null ? 0 : 1);
+      gl.uniform1f(loc.u_opacity, LOT_OPACITY);
+      gl.uniform3fv(loc.u_none, hexToRGB(COLOR_NONE));
+      gl.uniform3fv(loc.u_atLimit, hexToRGB(COLOR_AT_LIMIT));
+      gl.uniform3fv(loc.u_over, hexToRGB(COLOR_OVER));
+      gl.uniform3fv(loc.u_full, hexToRGB(COLOR_FULL));
+      gl.uniform3fv(loc.u_out, hexToRGB(COLOR_OUT));
+      gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      this.bindVAO(vao);
+      gl.drawElements(gl.TRIANGLES, mesh.idx.length, gl.UNSIGNED_INT, 0);
+      this.bindVAO(null);
+    },
+  };
+}
+
+// ---- Numbers for the summary --------------------------------------------------
+// Kept in plain arrays so the summary can be recounted on every slider move.
+let lotA, lotRS, n = 0;
+
+function summarise(t) {
+  let pass = 0, hardM2 = 0, areaM2 = 0, blocked = 0;
+  for (let i = 0; i < n; i++) {
+    const h = hardShare(lotRS[i], t);
+    if (passes(h)) pass++;
+    if (RAIN_LIMIT !== null && lotRS[i] > RAIN_LIMIT + 1e-9) blocked++;
+    hardM2 += h * lotA[i];
+    areaM2 += lotA[i];
+  }
+  return { pass, fail: n - pass, hardShare: hardM2 / areaM2, blocked };
+}
+
+// Numbers glide to their new value over a short moment instead of jumping.
+const shown = {};
+function glide(id, target, fmt) {
+  const el = document.getElementById(id);
+  const from = shown[id] ?? target;
+  const start = performance.now(), ms = 180;
+  shown[id] = target;
+  cancelAnimationFrame(el._raf);
+  const step = now => {
+    const k = Math.min(1, (now - start) / ms);
+    el.textContent = fmt(from + (target - from) * (1 - (1 - k) ** 3));
+    if (k < 1) el._raf = requestAnimationFrame(step);
+  };
+  el._raf = requestAnimationFrame(step);
+}
+const int = x => Math.round(x).toLocaleString("en-CA");
+
+function positionText(t) {
+  if (t < 0.005) return "At: Bylaw today";
+  if (Math.abs(t - 1) < 0.005) return "At: Meets Rain City";
+  if (t > 1.995) return "At: No paving (roofs only)";
+  return t < 1 ? "Between Bylaw today and Meets Rain City"
+               : "Between Meets Rain City and No paving";
+}
+
+// Slider -> numbers and map colours, both on the very next frame.
+const slider = document.getElementById("slider");
+function update() {
+  if (n === 0) return;             // lots not loaded yet
+  const t = +slider.value;
+  const s = summarise(t);
+  glide("hsPct", s.hardShare * 100, x => x.toFixed(1) + "%");
+  glide("passN", s.pass, int);
+  glide("failN", s.fail, int);
+  document.getElementById("position").textContent = positionText(t);
+  document.getElementById("blocked").textContent = RAIN_LIMIT === null
+    ? `At ${D} mm the soil holds less than the rain that falls on it, so no lot can pass.`
+    : `${int(s.blocked)} of the ${int(n)} lots can never pass: their roofs alone ` +
+      `already cover more than ${pct(RAIN_LIMIT)}.`;
+  map.triggerRepaint();          // the lot layer reads the slider as it draws
+}
+slider.addEventListener("input", update);
+document.querySelectorAll(".stops button").forEach(b =>
+  b.addEventListener("click", () => { slider.value = b.dataset.t; update(); }));
+document.getElementById("cityBtn").addEventListener("click", () =>
+  map.fitBounds(CITY_BOUNDS, { padding: 20 }));
+
+// ---- Load the lots ----------------------------------------------------------
+map.on("load", async () => {
+  let data;
+  try {
+    data = await (await fetch(DATA_FILE)).json();
+  } catch (e) {
+    document.getElementById("loading").textContent =
+      `Could not load ${DATA_FILE}. Run buildings.py first, and open this page ` +
+      `through  python3 -m http.server  (see the top of this file).`;
+    return;
+  }
+  // Only ordinary lots (sc = 0) go into the counts; the rest are drawn grey.
+  const inScope = data.features.filter(f => f.properties.sc === 0);
+  n = inScope.length;
+  lotA = new Float64Array(n); lotRS = new Float64Array(n);
+  inScope.forEach((f, i) => {
+    lotA[i] = f.properties.A;
+    lotRS[i] = roofShare(f.properties.A, f.properties.r);
+  });
+
+  // The outlines and labels still come from MapLibre; they never change.
+  map.addSource("lots", { type: "geojson", data });
+  // The basemap draws its own buildings (from OpenStreetMap). They are not
+  // the 2015 City roofs this page counts, so hide them to avoid confusion.
+  map.getStyle().layers.filter(l => l["source-layer"] === "building")
+     .forEach(l => map.setLayoutProperty(l.id, "visibility", "none"));
+  // The basemap's first text layer: our lots go underneath it.
+  const firstLabel = map.getStyle().layers.find(l => l.type === "symbol")?.id;
+  map.addLayer(lotLayer(buildLotMesh(data.features)), firstLabel);
+  // A thin line in the page colour between neighbouring lots, so each lot
+  // reads on its own. Merged sites have no internal line: they are one shape.
+  map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
+    paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb",
+             "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.3, 18, 1.5] } },
+    firstLabel);
+  map.addLayer({ id: "labels", type: "symbol", source: "lots",
+    filter: ["any", ["==", ["get", "m"], 1], ["==", ["get", "sc"], 1]],
+    layout: {
+      "text-field": ["case", ["==", ["get", "sc"], 1], "Outside scope (large site)", "merged site"],
+      "text-font": ["Noto Sans Bold"],
+      "text-size": 11,
+      "symbol-placement": "point",
+    },
+    minzoom: 16,
+    paint: { "text-color": dark ? "#f0efec" : "#1f1f1d",
+             "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
+
+  document.getElementById("loading").remove();
+  slider.disabled = false;
+  update();
+
+  // Building outlines: loaded AFTER the lots, so the slider works at once.
+  // They are drawn whole (not split at lot lines) and never change with the
+  // slider. Each outline also carries a height (h, with src L = 2009 LiDAR,
+  // P = placeholder) for future 3D models; this flat map does not use it.
+  try {
+    const buildings = await (await fetch(BUILDINGS_FILE)).json();
+    map.addSource("buildings", { type: "geojson", data: buildings });
+    // Roofs are hard surface at every slider position (no lot's hard surface
+    // ever drops below its roofs), so they are filled in one fixed colour and
+    // the lot's colour shows on the ground around them.
+    map.addLayer({ id: "building-fill", type: "fill", source: "buildings",
+      minzoom: BUILDINGS_MIN_ZOOM,
+      paint: { "fill-color": dark ? BUILDING_FILL_DARK : BUILDING_FILL, "fill-opacity": 0.95 } },
+      "labels");
+    map.addLayer({ id: "building-outlines", type: "line", source: "buildings",
+      minzoom: BUILDINGS_MIN_ZOOM,
+      paint: { "line-color": dark ? "#f0efec" : "#1f1f1d", "line-opacity": 0.8,
+               "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.4, 18, 1.6] } },
+      "labels");
+  } catch (e) {
+    console.warn(`Could not load ${BUILDINGS_FILE}; building outlines not shown.`, e);
+  }
+});
+</script>
+</body>
+</html>
