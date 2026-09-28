@@ -63,6 +63,20 @@ retention during a 48 mm storm. The distinct building-coverage maximum is 50%
 under s. 3.2.2.7. The site-wide water estimate uses 75 mm of soil storage and
 85% runoff from impermeable surfaces; it is an illustrative scenario, not a
 measurement of existing conditions or a claim of legal compliance.
+For each site it estimates rainfall on permeable ground plus runoff from
+impermeable ground, caps that amount at permeable soil storage, converts
+millimetres times square metres to cubic metres (divide by 1,000), and sums
+across sites. It assumes impermeable-surface runoff reaches permeable ground.
+
+The map reports the 50% building-coverage check separately, using mapped 2015
+roof footprints and not the slider setting. Dark footprints are at or below
+50%, amber footprints and outlined lots are potential roof-coverage
+exceedances, and purple footprints alone exceed the 75% impermeable-material
+cap. Zoomed-out amber count markers cluster flagged sites at approximate
+locations; clicking a cluster zooms in, and closer views outline individual
+lots. The footprints include eaves and are approximate. The slider shows a
+hypothetical total impermeable share; it is not a survey of existing paving or
+a combined by-law compliance test.
 
 The full lot and 2015 building-footprint GeoJSON files are generated locally
 and are not committed (`map/data/` is ignored because the outputs are large).

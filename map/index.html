@@ -6,10 +6,12 @@
 
 WHAT THIS PAGE SHOWS
   A hypothetical material mix for every ordinary R1-1 lot in Vancouver. The
-  slider sets impermeable hardscape from 0% (an empty, fully permeable lot) to
-  the by-law maximum of 75%. Blue represents permeable area; red represents
-  impermeable area. Click a lot for its exact area split. The water readout
-  estimates how much of a 48 mm storm the permeable area can hold.
+  slider sets total impermeable materials from 0% (an empty, fully permeable
+  lot) to the by-law maximum of 75%. Blue represents permeable area; red
+  represents impermeable area. A separate 50% building-coverage check uses
+  mapped 2015 roof footprints; orange roofs exceed 50%, purple roofs exceed
+  75%. Click a lot for its coverage and scenario details. Water is context,
+  not a by-law compliance test.
 
 HOW TO OPEN IT
   It needs a tiny local web server (a browser won't load the data file
@@ -27,8 +29,10 @@ TO CHANGE THE NUMBERS
 
 WHERE THE DATA COMES FROM
   map/data/lots.geojson is written by buildings.py. For each lot it holds
-  the site area (A); the selected material areas and water estimate are
-  calculated from it and the CONFIGURATION values.
+  the site area (A) and roof area (r); the selected material areas and water
+  estimate are calculated from these and the CONFIGURATION values.
+  map/data/buildings.geojson holds 2015 building footprints and their site's
+  roof-share threshold for rendering.
 ================================================================================
 -->
 <html lang="en">
@@ -95,25 +99,35 @@ WHERE THE DATA COMES FROM
   .stops button:hover { color: var(--ink); text-decoration: underline; }
   .stops button:first-child { transform: none; text-align: left; }
   .stops button:last-child { transform: translateX(-100%); text-align: right; }
-  .building-cap { position: relative; height: 25px; margin-top: 4px;
-    color: var(--ink-2); font-size: 11px; }
-  .building-cap::before { content: ""; position: absolute; left: var(--building-cap-position, 66.667%); top: -5px;
-    height: 6px; border-left: 1px solid var(--ink-2); }
-  .building-cap span { position: absolute; left: var(--building-cap-position, 66.667%); transform: translateX(-50%);
-    white-space: nowrap; }
-
   .big { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .label { color: var(--ink-2); font-size: 12px; }
   .material-key { display: flex; gap: 12px; margin-top: 8px; font-size: 12px; }
   .water-card { margin: 14px 0; padding: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--surface));
     border: 1px solid var(--rule); border-radius: 6px; }
   .water-card .big { font-size: 24px; }
+  .water-formula { margin: 6px 0 10px; padding: 8px 10px;
+    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+    font-size: 11px; line-height: 1.45; }
+  .water-formula strong { display: block; margin-bottom: 3px; color: var(--ink); }
   .rule-status { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--rule);
     border-radius: 6px; font-size: 12px; }
   .rule-status strong { display: block; margin-bottom: 3px; }
+  .rule-status p { margin: 4px 0 0; }
+  .rule-note { color: var(--ink-2); font-size: 11px; }
+  .risk-count { display: flex; align-items: baseline; gap: 8px; margin: 5px 0; }
+  .risk-count b { color: #b45309; font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
+  @media (prefers-color-scheme: dark) {
+    .risk-count b { color: #ffbf47; }
+  }
 
   .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px;
     vertical-align: -2px; margin-right: 6px; }
+  .risk-outline-swatch { box-sizing: border-box; background: transparent !important;
+    border: 2px solid #ffbf00; outline: 1px solid #17212b; }
+  .risk-cluster-swatch { width: 18px; height: 18px; border: 1.5px solid #17212b;
+    border-radius: 50%; background: #ffbf00; color: #17212b; font-size: 8px;
+    font-weight: 700; line-height: 16px; text-align: center; }
 
   .notes { margin: 14px 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--ink-3); }
   .notes li { margin: 0 0 3px; }
@@ -140,13 +154,21 @@ WHERE THE DATA COMES FROM
     <span><span class="swatch" id="permeableSwatch"></span>Permeable: <b id="permeablePct">25%</b></span>
   </div>
   <input type="range" id="slider" min="0" max="75" step="1" value="75" disabled
-         aria-label="Impermeable hardscape percentage on every lot">
+         aria-label="Hypothetical impermeable-material percentage on every lot">
   <div class="stops">
-    <button data-t="0" style="left:0%">0% hardscape<br>permeable lot</button>
+    <button data-t="0" style="left:0%">0% hardscape<br>empty lot</button>
     <button id="maximumStop" data-t="75" style="left:100%">75% hardscape<br>bylaw maximum</button>
   </div>
-  <div class="building-cap"><span>50% maximum building coverage (s. 3.2.2.7)</span></div>
-  <div class="rule-status" id="ruleStatus">Loading bylaw status&hellip;</div>
+  <div class="rule-status">
+    <strong>Building coverage · 50% maximum (s. 3.2.2.7)</strong>
+    <div id="buildingRuleStatus">Calculating mapped roof coverage&hellip;</div>
+    <p class="rule-note">This check uses mapped 2015 roof footprints alone; it does not depend on the slider. Footprints include eaves and are approximate. Zoomed-out circles count flagged sites at approximate locations; click to zoom in to outlined lots.</p>
+  </div>
+  <div class="rule-status">
+    <strong>Impermeable materials · 75% maximum (s. 3.2.2.8)</strong>
+    <p id="impermeableRuleStatus">Loading scenario&hellip;</p>
+    <p class="rule-note">The slider is a hypothetical total material mix. Other existing hard surfaces are not mapped, so this is not a compliance finding.</p>
+  </div>
 
   <div class="water-card">
     <div class="label">Illustrative water held during a 48&nbsp;mm storm</div>
@@ -155,7 +177,12 @@ WHERE THE DATA COMES FROM
   </div>
 
   <div class="legend">
-    <div class="label">Blue is permeable; red is impermeable, growing north from the south edge. Dark houses show measured roof coverage. Orange footprints identify roofs above the 75% limit.</div>
+    <div class="label">Blue is permeable; red is impermeable, growing north from the south edge. The split is hypothetical; mapped roofs appear when the slider reaches their measured share.</div>
+    <div class="water-formula" id="waterFormula"></div>
+    <div class="label"><span class="swatch" id="roofWithinSwatch"></span>Roof within 50% building limit</div>
+    <div class="label"><span class="swatch risk-outline-swatch"></span>Potential roof-coverage exceedance (amber parcel outline)</div>
+    <div class="label"><span class="swatch risk-cluster-swatch">#</span>Cluster circles count flagged sites when zoomed out; click to zoom in</div>
+    <div class="label"><span class="swatch" id="roofOver75Swatch"></span>Roof alone exceeds 75% cap (purple footprint)</div>
     <div class="label"><span class="swatch" id="greySwatch"></span>Outside scope: large sites over 2,000&nbsp;m&sup2;, and road allowances</div>
   </div>
 
@@ -208,17 +235,12 @@ const P = DESIGN_RAINFALL_MM, C = RUNOFF_COEFF, D = D_EFF_MM;
 
 // ---- Page text that depends on the configuration ---------------------------
 document.getElementById("subtitle").textContent =
-  `Impermeable materials: 0–${BYLAW_MAX_IMPERMEABLE_RATIO * 100}% (s. 3.2.2.8). ` +
-  `Buildings: max ${BYLAW_MAX_BUILDING_RATIO * 100}% site coverage (s. 3.2.2.7).`;
-document.querySelector(".building-cap span").textContent =
-  `${BYLAW_MAX_BUILDING_RATIO * 100}% maximum building coverage (s. 3.2.2.7)`;
-document.querySelector(".building-cap span").parentElement.style.setProperty(
-  "--building-cap-position",
-  `${BYLAW_MAX_BUILDING_RATIO / BYLAW_MAX_IMPERMEABLE_RATIO * 100}%`,
-);
+  `Test a hypothetical total impermeable-material share from 0–${BYLAW_MAX_IMPERMEABLE_RATIO * 100}% ` +
+  `(s. 3.2.2.8); mapped roof coverage is checked separately against ${BYLAW_MAX_BUILDING_RATIO * 100}% ` +
+  `(s. 3.2.2.7).`;
 const notes = [
   `A site's measured 2015 roof share controls when its house appears. Building coverage may not exceed ${BYLAW_MAX_BUILDING_RATIO * 100}% of the site; the footprints are approximate and may be outdated.`,
-  "Roofs are included within the red impermeable share, not added on top of it. Red/blue shows the hypothetical material mix across the whole lot.",
+  "Building coverage is a separate 50% rule. Roof area is included in the 75% impermeable-material total.",
   `Water estimate assumes ${P} mm rainfall, ${Math.round(C * 100)}% runoff from impermeable surfaces, and ${D} mm storage in permeable soil (${SOIL_NAME}).`,
   "The 48 mm storm is environmental context, not a zoning pass/fail test.",
   "Zoom in to see each lot's material mix and roof share, or click a lot for bylaw status.",
@@ -228,6 +250,17 @@ document.getElementById("notes").innerHTML = notes.map(n => `<li>${n}</li>`).joi
 document.getElementById("greySwatch").style.background = COLOR_OUT;
 document.getElementById("impermeableSwatch").style.background = COLOR_IMPERMEABLE;
 document.getElementById("permeableSwatch").style.background = COLOR_PERMEABLE;
+document.getElementById("roofWithinSwatch").style.background = "#3d3d3a";
+document.getElementById("roofOver75Swatch").style.background = "#9333ea";
+document.getElementById("waterFormula").innerHTML =
+  `<strong>How the illustrative water estimate is calculated</strong>` +
+  `For each site, estimate rainfall on permeable ground plus runoff from impermeable ground, ` +
+  `assuming that runoff reaches the permeable area. Cap the amount at the soil's storage capacity, ` +
+  `then add the site estimates.<br>` +
+  `Held (m³) = &Sigma; min[(${P} &times; permeable m&sup2;) + ` +
+  `(${P} &times; ${Math.round(C * 100)}% &times; impermeable m&sup2;), ` +
+  `(${D} &times; permeable m&sup2;)] &divide; 1,000. ` +
+  `P = rainfall (mm); C = hard-surface runoff fraction; D = soil storage (mm).`;
 
 
 // ---- The map ------------------------------------------------------------------
@@ -391,14 +424,16 @@ const BUILDING_SHADER = {
     }`,
   fragment: `
     precision mediump float;
-    uniform float u_hard, u_maxImpermeable, u_opacity;
-    uniform vec3 u_color, u_warningColor;
+    uniform float u_hard, u_maxBuilding, u_maxImpermeable, u_opacity;
+    uniform vec3 u_color, u_warningColor, u_severeColor;
     varying float v_rs;
     void main() {
       if (u_hard + 0.00001 < v_rs && v_rs <= u_maxImpermeable + 0.00001) discard;
       if (v_rs > u_maxImpermeable + 0.00001 && u_hard + 0.00001 < u_maxImpermeable)
         discard;
-      vec3 color = v_rs > u_maxImpermeable + 0.00001 ? u_warningColor : u_color;
+      vec3 color = v_rs > u_maxImpermeable + 0.00001 ? u_severeColor
+                 : v_rs > u_maxBuilding + 0.00001 ? u_warningColor
+                 : u_color;
       gl_FragColor = vec4(color * u_opacity, u_opacity);
     }`,
 };
@@ -458,8 +493,8 @@ function buildingLayer(mesh) {
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
         throw new Error(gl.getProgramInfoLog(prog));
-      for (const u of ["u_matrix", "u_hard", "u_maxImpermeable", "u_opacity",
-                       "u_color", "u_warningColor"])
+      for (const u of ["u_matrix", "u_hard", "u_maxBuilding", "u_maxImpermeable",
+                       "u_opacity", "u_color", "u_warningColor", "u_severeColor"])
         loc[u] = gl.getUniformLocation(prog, u);
 
       vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
@@ -488,10 +523,12 @@ function buildingLayer(mesh) {
       gl.useProgram(prog);
       gl.uniformMatrix4fv(loc.u_matrix, false, m);
       gl.uniform1f(loc.u_hard, +slider.value / 100);
+      gl.uniform1f(loc.u_maxBuilding, BYLAW_MAX_BUILDING_RATIO);
       gl.uniform1f(loc.u_maxImpermeable, BYLAW_MAX_IMPERMEABLE_RATIO);
       gl.uniform1f(loc.u_opacity, 0.95);
       gl.uniform3fv(loc.u_color, hexToRGB(dark ? "#6b6a65" : "#3d3d3a"));
-      gl.uniform3fv(loc.u_warningColor, hexToRGB("#d97706"));
+      gl.uniform3fv(loc.u_warningColor, hexToRGB("#ffbf00"));
+      gl.uniform3fv(loc.u_severeColor, hexToRGB("#9333ea"));
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl2 ? gl.bindVertexArray(vao) : vaoExt.bindVertexArrayOES(vao);
@@ -531,6 +568,25 @@ function roofShareFor(lot) {
   return area > 0 ? Number(lot.properties.r || 0) / area : 0;
 }
 
+function featurePointOnBounds(feature) {
+  const positions = [];
+  const visit = value => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      positions.push(value);
+      return;
+    }
+    value.forEach(visit);
+  };
+  visit(feature.geometry.coordinates);
+  if (positions.length === 0) throw new Error("Lot geometry has no coordinate positions");
+  const bounds = positions.reduce((b, p) => [
+    Math.min(b[0], p[0]), Math.min(b[1], p[1]),
+    Math.max(b[2], p[0]), Math.max(b[3], p[1]),
+  ], [Infinity, Infinity, -Infinity, -Infinity]);
+  return [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+}
+
 function renderPopup() {
   if (!selectedLot || !popup) return;
   const area = Number(selectedLot.properties.A);
@@ -543,19 +599,20 @@ function renderPopup() {
   title.textContent = selectedLot.properties.ad || "R1-1 lot";
   content.append(title);
   const details = document.createElement("div");
-  const buildingStatus = roofShare > BYLAW_MAX_BUILDING_RATIO
-    ? "Building coverage exceeds the 50% limit"
-    : "Building coverage is within the 50% limit";
-  const totalStatus = roofShare > BYLAW_MAX_IMPERMEABLE_RATIO
-    ? "Roof cannot fit within the 75% impermeable-material limit"
-    : "Roof fits within the 75% impermeable-material limit";
+  const scenarioBelowRoof = hardShare + 0.00001 < roofShare;
+  const roofImpermeability = roofShare > BYLAW_MAX_IMPERMEABLE_RATIO
+    ? "The roof alone exceeds the 75% impermeable-material cap."
+    : "The roof alone is within 75%; other impermeable surfaces are not mapped.";
+  details.style.whiteSpace = "pre-line";
   details.textContent =
-    `Lot area: ${area.toFixed(1)} m² · Building coverage: ${(roofShare * 100).toFixed(1)}% ` +
-    `(${BYLAW_MAX_BUILDING_RATIO * 100}% max; ` +
-    `${buildingStatus}) · ${totalStatus} · ` +
-    `Impermeable: ${slider.value}% (${hardArea.toFixed(1)} m²) · ` +
-    `Permeable: ${100 - +slider.value}% (${permeableArea.toFixed(1)} m²) · ` +
-    `Water held: ${waterHeldM3(area, hardShare).toFixed(2)} m³`;
+    `Lot area: ${area.toFixed(1)} m²\n` +
+    `Building rule (50% max): mapped roof coverage ${(roofShare * 100).toFixed(1)}% — ` +
+    `${roofShare > BYLAW_MAX_BUILDING_RATIO ? "POTENTIAL EXCEEDANCE from roof area alone" : "within"}.\n` +
+    `Impermeable-material rule (75% max): ${roofImpermeability}\n` +
+    `Slider scenario: ${slider.value}% impermeable (${hardArea.toFixed(1)} m²), ` +
+    `${100 - +slider.value}% permeable (${permeableArea.toFixed(1)} m²)` +
+    `${scenarioBelowRoof ? " — below the mapped roof area, so this is only a hypothetical setting." : "."}\n` +
+    `Illustrative water held: ${waterHeldM3(area, hardShare).toFixed(2)} m³`;
   content.append(details);
   popup.setDOMContent(content);
 }
@@ -573,12 +630,13 @@ function update() {
   const overImpermeablePct = n > 0 ? (overImpermeableCount / n * 100).toFixed(2) : "0.00";
   document.getElementById("impermeablePct").textContent = `${hardPct}%`;
   document.getElementById("permeablePct").textContent = `${100 - hardPct}%`;
-  document.getElementById("ruleStatus").innerHTML =
-    `<strong>Bylaw status</strong>${hardPct}% total impermeable material is ` +
-    `${hardPct <= BYLAW_MAX_IMPERMEABLE_RATIO * 100 ? "within" : "over"} the 75% limit. ` +
-    `${overBuildingCount.toLocaleString("en-CA")} lots have roofs over the 50% building limit; ` +
-    `${overImpermeableCount.toLocaleString("en-CA")} of ${n.toLocaleString("en-CA")} lots ` +
-    `(${overImpermeablePct}%) have roofs above 75%; their footprints turn orange at the slider maximum.`;
+  document.getElementById("buildingRuleStatus").innerHTML =
+    `<div class="risk-count"><b>${overBuildingCount.toLocaleString("en-CA")}</b><span>potential roof-coverage exceedances</span></div>` +
+    `<p>${(overBuildingCount / n * 100).toFixed(1)}% of ${n.toLocaleString("en-CA")} sites have mapped roof area above 50%. ` +
+    `At ${overImpermeableCount.toLocaleString("en-CA")} sites, roof footprints alone also exceed 75%.</p>`;
+  document.getElementById("impermeableRuleStatus").textContent =
+    `Selected scenario: ${hardPct}% impermeable and ${100 - hardPct}% permeable per site ` +
+    `(75% cap). This is not a measured compliance result; existing non-roof surfaces are not mapped.`;
   map.setLayoutProperty("material-percentage-labels", "text-field", [
     "concat",
     `P ${100 - hardPct} / I ${hardPct} · Roof `,
@@ -635,7 +693,74 @@ map.on("load", async () => {
   // A transparent hit target lets users click individual lots for exact values.
   map.addLayer({ id: "lot-hit-area", type: "fill", source: "lots",
     paint: { "fill-color": "#000000", "fill-opacity": 0.02 } }, firstLabel);
+  const riskSites = inScope.filter(f =>
+    Number(f.properties.r) / Number(f.properties.A) > BYLAW_MAX_BUILDING_RATIO);
+  map.addSource("roof-risk-points", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: riskSites.map(f => ({
+        type: "Feature",
+        properties: { roofShare: roofShareFor(f) },
+        geometry: { type: "Point", coordinates: featurePointOnBounds(f) },
+      })),
+    },
+    cluster: true,
+    clusterRadius: 44,
+    clusterMaxZoom: 15,
+  });
+  map.addLayer({ id: "roof-risk-clusters", type: "circle", source: "roof-risk-points",
+    filter: ["has", "point_count"],
+    paint: {
+      "circle-color": "#ffbf00",
+      "circle-radius": ["step", ["get", "point_count"], 15, 20, 19, 100, 24, 500, 30],
+      "circle-stroke-color": "#17212b",
+      "circle-stroke-width": 2,
+      "circle-opacity": 0.96,
+    } }, firstLabel);
+  map.addLayer({ id: "roof-risk-cluster-counts", type: "symbol", source: "roof-risk-points",
+    filter: ["has", "point_count"],
+    layout: {
+      "text-field": ["get", "point_count_abbreviated"],
+      "text-font": ["Noto Sans Bold"],
+      "text-size": 12,
+      "text-allow-overlap": true,
+    },
+    paint: { "text-color": "#17212b" } }, firstLabel);
+  map.addLayer({ id: "roof-risk-single-sites", type: "circle", source: "roof-risk-points",
+    filter: ["!", ["has", "point_count"]],
+    maxzoom: 15.5,
+    paint: {
+      "circle-color": "#ffbf00",
+      "circle-radius": 5,
+      "circle-stroke-color": "#17212b",
+      "circle-stroke-width": 1.5,
+    } }, firstLabel);
+  for (const [id, color, width] of [
+    ["roof-risk-casing", "#17212b", ["interpolate", ["linear"], ["zoom"], 15, 2.5, 18, 6]],
+    ["roof-risk-outline", "#ffbf00", ["interpolate", ["linear"], ["zoom"], 15, 1, 18, 3.5]],
+  ]) {
+    map.addLayer({
+      id, type: "line", source: "lots", minzoom: 15,
+      filter: ["all",
+        ["==", ["get", "sc"], 0],
+        [">", ["/", ["get", "r"], ["get", "A"]], BYLAW_MAX_BUILDING_RATIO]],
+      layout: { "line-join": "round" },
+      paint: { "line-color": color, "line-width": width },
+    }, firstLabel);
+  }
+  map.on("click", "roof-risk-clusters", event => {
+    map.easeTo({ center: event.lngLat, zoom: Math.min(map.getZoom() + 2, 18) });
+  });
+  map.on("mouseenter", "roof-risk-clusters", () => {
+    map.getCanvas().style.cursor = "pointer";
+  });
+  map.on("mouseleave", "roof-risk-clusters", () => {
+    map.getCanvas().style.cursor = "";
+  });
   map.on("click", "lot-hit-area", event => {
+    if (map.queryRenderedFeatures(event.point, { layers: ["roof-risk-clusters"] }).length > 0)
+      return;
     const feature = event.features?.find(f => f.properties.sc === 0);
     if (!feature) return;
     popup?.remove();
