@@ -24,7 +24,7 @@ WHAT THIS SCRIPT DOES
   8. Writes (one row per SITE; most sites are a single parcel):
        r11_stage2.geojson        every site, full detail, every field
        map/data/lots.geojson     what the web map needs, and nothing else
-       map/data/buildings.geojson  the building outlines the map draws
+     map/data/buildings.geojson  building outlines with site roof-share thresholds
 
 HOW TO RUN IT
      source .venv/bin/activate
@@ -508,7 +508,7 @@ def main():
     write_web(parcels)
     print("\n  Building heights (3D models only)")
     on_r11 = add_heights(on_r11)
-    write_web_buildings(on_r11)
+    write_web_buildings(on_r11, pieces, parcels)
 
     summary(parcels)
     check_data_list(parcels)
@@ -589,23 +589,31 @@ def add_heights(b):
     return b
 
 
-def write_web_buildings(b):
-    """The building outlines the map draws on top of the lots.
+def write_web_buildings(b, pieces, parcels):
+    """Building outlines with the lot roof share at which they appear.
 
-    Each building is drawn WHOLE, even where it crosses a lot line -- only
-    the roof NUMBERS are split between lots, not the picture. Properties:
+    Each building is drawn WHOLE, even where it crosses a lot line. A building
+    is associated with the site where most of its footprint stands; its roof
+    share is the slider threshold at which the house appears. Properties:
       id  the City's object_id for the footprint
       a   the footprint's full area, m2
       h   height in metres, for 3D models only (see add_heights)
+      rs  dominant site's roof share, 0-1
       src L = measured by 2009 LiDAR, P = placeholder
     """
     import json
+    dominant_sites = (pieces.loc[pieces.groupby("object_id")["area_m2"].idxmax(),
+                                 ["object_id", "site_key"]]
+                      .set_index("object_id")["site_key"])
+    site_roof_share = parcels.set_index("site_key")["roof_share"]
     g = b[["object_id", "area_m2", "height_m", "height_source", "geometry"]].copy()
+    g["roof_share"] = g["object_id"].map(dominant_sites).map(site_roof_share).fillna(0)
     g["geometry"] = g.geometry.simplify(SIMPLIFY_M, preserve_topology=True)
     g = g.to_crs(WGS84)
     feats = [{"type": "Feature",
               "properties": {"id": int(r["object_id"]), "a": round(float(r["area_m2"]), 1),
                              "h": float(r["height_m"]),
+                             "rs": round(float(r["roof_share"]), 4),
                              "src": "L" if r["height_source"] == "lidar_2009" else "P"},
               "geometry": round_coords(r.geometry.__geo_interface__)}
              for _, r in g.iterrows()]

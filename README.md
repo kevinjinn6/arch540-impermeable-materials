@@ -36,6 +36,7 @@ connection yet. Nothing here is a finished submission.
 
 ```
 README.md                     you are here
+map/index.html                interactive 0–75% impermeable-material slider
 docs/
   regulation-shortlist.md     preferred source + two ranked alternatives, argued
   prompt-comparison.md        W1 exercise: what changed between two prompt approaches
@@ -52,6 +53,22 @@ assignment 1.qgz              QGIS project for viewing the output
 Start with [`docs/regulation-shortlist.md`](docs/regulation-shortlist.md) for the
 choice of source, and [`docs/prompt-comparison.md`](docs/prompt-comparison.md) for
 the W1 exercise.
+
+The interactive map sets each in-scope lot from 0% impermeable (fully
+permeable) to the R1-1 by-law maximum of 75%. The hypothetical site starts
+empty; each 2015 building footprint appears when the slider reaches its site's
+measured roof share. Zoom in to see the lot's permeable/impermeable split and
+roof-share percentage, or click a lot for its area split and estimated water
+retention during a 48 mm storm. The distinct building-coverage maximum is 50%
+under s. 3.2.2.7. The site-wide water estimate uses 75 mm of soil storage and
+85% runoff from impermeable surfaces; it is an illustrative scenario, not a
+measurement of existing conditions or a claim of legal compliance.
+
+The full lot and 2015 building-footprint GeoJSON files are generated locally
+and are not committed (`map/data/` is ignored because the outputs are large).
+If `r11_stormwater.geojson` is missing, first run `python3 stormwater.py`, then
+run `python3 buildings.py` from the repository root before opening
+`map/index.html`; this restores the complete lot map and house overlays.
 
 ---
 

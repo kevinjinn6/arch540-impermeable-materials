@@ -5,20 +5,19 @@
 ================================================================================
 
 WHAT THIS PAGE SHOWS
-  Every ordinary R1-1 lot in Vancouver, coloured by how much of it is hard
-  surface (roofs plus paving). One slider moves every lot, left to right,
-  from "Bylaw today" (the s.3.2.2.8 limit, 75%) through "Meets Rain City"
-  (the most hard surface the 48 mm storm allows) to "No paving (roofs only)"
-  (only the buildings are hard). Each step right means less hard surface, so
-  the map gets bluer. The summary counts how many lots handle the storm at
-  the slider's position.
+  A hypothetical material mix for every ordinary R1-1 lot in Vancouver. The
+  slider sets impermeable hardscape from 0% (an empty, fully permeable lot) to
+  the by-law maximum of 75%. Blue represents permeable area; red represents
+  impermeable area. Click a lot for its exact area split. The water readout
+  estimates how much of a 48 mm storm the permeable area can hold.
 
 HOW TO OPEN IT
   It needs a tiny local web server (a browser won't load the data file
   straight from disk). In a terminal, from the project folder:
-       python3 buildings.py              (once, to make map/data/lots.geojson)
-       cd map
-       python3 -m http.server
+      python3 stormwater.py             (if r11_stormwater.geojson is absent)
+      python3 buildings.py              (to make all map/data/*.geojson files)
+      cd map
+      python3 -m http.server
   then open  http://localhost:8000  in a browser.
 
 TO CHANGE THE NUMBERS
@@ -28,8 +27,8 @@ TO CHANGE THE NUMBERS
 
 WHERE THE DATA COMES FROM
   map/data/lots.geojson is written by buildings.py. For each lot it holds
-  only the site area (A) and the roof area (r); every other number on this
-  page is worked out here from those two and the CONFIGURATION values.
+  the site area (A); the selected material areas and water estimate are
+  calculated from it and the CONFIGURATION values.
 ================================================================================
 -->
 <html lang="en">
@@ -85,9 +84,8 @@ WHERE THE DATA COMES FROM
   h1 { font-size: 16px; margin: 0 0 2px; }
   .sub { color: var(--ink-2); font-size: 12px; margin: 0 0 14px; }
 
-  .readout { display: flex; justify-content: space-between; align-items: baseline; }
+  .readout { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .readout b { font-size: 20px; font-variant-numeric: tabular-nums; }
-  .position { color: var(--ink-2); font-size: 12px; min-height: 17px; }
 
   input[type=range] { width: 100%; margin: 10px 0 2px; accent-color: var(--accent); }
   .stops { position: relative; height: 30px; font-size: 11px; color: var(--ink-2); }
@@ -97,25 +95,23 @@ WHERE THE DATA COMES FROM
   .stops button:hover { color: var(--ink); text-decoration: underline; }
   .stops button:first-child { transform: none; text-align: left; }
   .stops button:last-child { transform: translateX(-100%); text-align: right; }
+  .building-cap { position: relative; height: 25px; margin-top: 4px;
+    color: var(--ink-2); font-size: 11px; }
+  .building-cap::before { content: ""; position: absolute; left: var(--building-cap-position, 66.667%); top: -5px;
+    height: 6px; border-left: 1px solid var(--ink-2); }
+  .building-cap span { position: absolute; left: var(--building-cap-position, 66.667%); transform: translateX(-50%);
+    white-space: nowrap; }
 
-  .summary { margin: 14px 0; padding: 12px 0; border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule); }
   .big { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .summary .row { display: flex; gap: 16px; }
-  .summary .row > div { flex: 1; }
   .label { color: var(--ink-2); font-size: 12px; }
-  .blocked { margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+  .material-key { display: flex; gap: 12px; margin-top: 8px; font-size: 12px; }
+  .water-card { margin: 14px 0; padding: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border: 1px solid var(--rule); border-radius: 6px; }
+  .water-card .big { font-size: 24px; }
+  .rule-status { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--rule);
+    border-radius: 6px; font-size: 12px; }
+  .rule-status strong { display: block; margin-bottom: 3px; }
 
-  .legend .bar { height: 12px; border-radius: 3px; margin: 6px 0 0; }
-  .legend .ticks { position: relative; height: 30px; font-size: 11px; color: var(--ink-2); }
-  .legend .ticks span { position: absolute; transform: translateX(-50%);
-    white-space: nowrap; text-align: center; line-height: 1.2; padding-top: 4px; }
-  .legend .ticks span::before { content: ""; position: absolute; top: -4px; left: 50%;
-    width: 1px; height: 6px; background: var(--ink-2); }
-  .legend .ticks span.edge-l { transform: none; }
-  .legend .ticks span.edge-l::before { left: 0; }
-  .legend .ticks span.edge-r { transform: translateX(-100%); }
-  .legend .ticks span.edge-r::before { left: auto; right: 0; }
   .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px;
     vertical-align: -2px; margin-right: 6px; }
 
@@ -134,39 +130,33 @@ WHERE THE DATA COMES FROM
 <div id="loading">Loading about 62,000 lots&hellip;</div>
 
 <div id="panel">
-  <h1>How much of each R1-1 lot is hard surface?</h1>
+  <h1>Impermeable hardscape on R1-1 lots</h1>
   <p class="sub" id="subtitle"></p>
 
   <div class="readout">
-    <span>Hard surface: <b id="hsPct">&ndash;</b></span>
-    <span class="label">average, all lots</span>
+    <span><span class="swatch" id="impermeableSwatch"></span>Impermeable: <b id="impermeablePct">75%</b></span>
   </div>
-  <div class="position" id="position"></div>
-  <input type="range" id="slider" min="0" max="2" step="0.001" value="0" disabled
-         aria-label="Hard surface on every lot">
+  <div class="readout">
+    <span><span class="swatch" id="permeableSwatch"></span>Permeable: <b id="permeablePct">25%</b></span>
+  </div>
+  <input type="range" id="slider" min="0" max="75" step="1" value="75" disabled
+         aria-label="Impermeable hardscape percentage on every lot">
   <div class="stops">
-    <button data-t="0" style="left:0%">Bylaw<br>today</button>
-    <button data-t="1" style="left:50%">Meets<br>Rain City</button>
-    <button data-t="2" style="left:100%">No paving<br>(roofs only)</button>
+    <button data-t="0" style="left:0%">0% hardscape<br>permeable lot</button>
+    <button id="maximumStop" data-t="75" style="left:100%">75% hardscape<br>bylaw maximum</button>
   </div>
+  <div class="building-cap"><span>50% maximum building coverage (s. 3.2.2.7)</span></div>
+  <div class="rule-status" id="ruleStatus">Loading bylaw status&hellip;</div>
 
-  <div class="summary">
-    <div class="row">
-      <div><div class="big" id="passN">&ndash;</div>
-           <div class="label">lots handle the 48&nbsp;mm storm</div></div>
-      <div><div class="big" id="failN">&ndash;</div>
-           <div class="label">lots do not</div></div>
-    </div>
-    <div class="blocked" id="blocked"></div>
+  <div class="water-card">
+    <div class="label">Illustrative water held during a 48&nbsp;mm storm</div>
+    <div class="big"><span id="waterHeld">&ndash;</span> m&sup3;</div>
+    <div class="label" id="waterScope">Environmental estimate; not a bylaw pass/fail test</div>
   </div>
 
   <div class="legend">
-    <div class="label">Colour = hard surface as a share of the lot.
-      Blue handles the storm; red does not.</div>
-    <div class="bar" id="legendBar"></div>
-    <div class="ticks" id="legendTicks"></div>
+    <div class="label">Blue is permeable; red is impermeable, growing north from the south edge. Dark houses show measured roof coverage. Orange footprints identify roofs above the 75% limit.</div>
     <div class="label"><span class="swatch" id="greySwatch"></span>Outside scope: large sites over 2,000&nbsp;m&sup2;, and road allowances</div>
-    <div class="label"><span class="swatch" id="roofSwatch"></span>Building &mdash; always hard surface (2015; zoom in to see)</div>
   </div>
 
   <button id="cityBtn">Zoom out to the whole city</button>
@@ -179,37 +169,24 @@ WHERE THE DATA COMES FROM
 //  CONFIGURATION  --  change these numbers, not the code below
 // =============================================================================
 
-// ---- Rainfall and soil (same meaning as in buildings.py) -------------------
+// ---- Rainfall and soil assumptions ----------------------------------------
 const DESIGN_RAINFALL_MM = 48;    // Rain City daily standard: mm in 24 hours
 const RUNOFF_COEFF = 0.85;        // share of rain that runs off hard surfaces
 const D_EFF_MM = 75;              // soil holding depth: mm of water the
                                   // permeable ground holds before it sheds.
-                                  //   30 = compacted lawn   48 = break-even
-                                  //   75 = good soil       285 = rain garden
+                                  // Assumes good soil.
 const SOIL_NAME = "good soil";    // how D_EFF_MM is described on the page
 
 // ---- The by-law ------------------------------------------------------------
-const BYLAW_IMPERMEABLE_RATIO = 0.75;
-// s.3.2.2.8: impermeable materials may cover at most 75% of the site.
-// This is the "Bylaw today" stop on the slider.
+const BYLAW_MAX_IMPERMEABLE_RATIO = 0.75;
+// R1-1 s.3.2.2.8: impermeable materials may cover at most 75% of the site.
+const BYLAW_MAX_BUILDING_RATIO = 0.50;
+// R1-1 s.3.2.2.7: all buildings may cover at most 50% of the site.
 
 // ---- Colours for the lots --------------------------------------------------
-// One scale, split at the Rain City limit:
-//   blue = at or under the limit -- the lot handles the storm. Darker blue
-//          means more room to spare.
-//   red  = over the limit -- the lot does not. Darker red means further over.
-// The colour flips from blue to red exactly at the limit, so pass and fail
-// can never be confused, and no lot is ever drawn grey (grey means "outside
-// scope" only).
-const COLOR_NONE = "#104281";     // 0% hard surface
-const COLOR_AT_LIMIT = "#3987e5"; // exactly at the limit (still passing)
-const COLOR_OVER = "#e34948";     // just over the limit
-const COLOR_FULL = "#8f1d1d";     // 100% hard surface
+const COLOR_PERMEABLE = "#287bc1";   // blue
+const COLOR_IMPERMEABLE = "#d94a48"; // red
 const COLOR_OUT = "#b9b8b2";      // outside scope (large sites, rights-of-way)
-const BUILDING_FILL = "#3d3d3a";  // roofs: always hard surface, whatever the
-                                  // slider says, so they keep one fixed colour.
-                                  // Not red -- red means "this lot fails".
-const BUILDING_FILL_DARK = "#6b6a65"; // the same, when your computer is in dark mode
 const LOT_OPACITY = 0.85;         // 1 = solid; lower lets the street map show
 
 // ---- Where the map opens ---------------------------------------------------
@@ -219,77 +196,38 @@ const OPEN_AT = { center: [-123.07530, 49.25520], zoom: 16.5 };
 const CITY_BOUNDS = [[-123.2245, 49.1985], [-123.0236, 49.2951]];
 
 const DATA_FILE = "data/lots.geojson";
-const BUILDINGS_FILE = "data/buildings.geojson";   // 2015 building outlines
-const BUILDINGS_MIN_ZOOM = 14;    // outlines appear from this zoom in (city = ~11)
-
+const BUILDINGS_FILE = "data/buildings.geojson";   // 2015 building footprints
+const BUILDINGS_MIN_ZOOM = 14;
 // =============================================================================
 //  END OF CONFIGURATION
 // =============================================================================
 
 
-// ---- The water balance ------------------------------------------------------
-// The permeable ground must hold the rain on itself plus the runoff from the
-// hard part:   Perm x D  >=  Perm x P  +  Hard x P x C
-// Solving for the most hard surface allowed, as a SHARE of the lot:
-//   limit = 1 - P x C / (D - P + P x C)
-// It is the same share for every lot, because both sides scale with lot area.
-// When D is less than P the soil cannot even hold the rain that falls on it,
-// so no lot can pass: limit = null.
+// ---- Water retained during the design storm --------------------------------
 const P = DESIGN_RAINFALL_MM, C = RUNOFF_COEFF, D = D_EFF_MM;
-const RAIN_LIMIT = D >= P ? Math.max(0, 1 - (P * C) / (D - P + P * C)) : null;
-const LIMIT = RAIN_LIMIT === null ? 0 : RAIN_LIMIT;   // for drawing only
-
-// ---- How the slider moves each lot -----------------------------------------
-// Slider position t runs 0 -> 1 -> 2 through the three named stops, from the
-// most hard surface to the least, so the map gets bluer left to right:
-//   t = 0  Bylaw today      hard surface = 75% of the lot
-//   t = 1  Meets Rain City  hard surface = RAIN_LIMIT of the lot
-//   t = 2  No paving        hard surface = the lot's roofs, nothing else
-// Between stops each lot moves in a straight line. Hard surface can never be
-// less than the roofs, so a lot whose roofs already exceed a stop stays at
-// its roof share there. A lot whose roofs exceed RAIN_LIMIT can never pass.
-function roofShare(A, r) { return Math.min(1, r / A); }
-function hardShare(rs, t) {
-  const bylaw = Math.max(BYLAW_IMPERMEABLE_RATIO, rs);
-  const meets = Math.max(RAIN_LIMIT === null ? 0 : RAIN_LIMIT, rs);
-  return t <= 1 ? bylaw + (meets - bylaw) * t : meets + (rs - meets) * (t - 1);
-}
-function passes(h) { return RAIN_LIMIT !== null && h <= RAIN_LIMIT + 1e-9; }
-
-// The map colours each lot with the same rule, run on the graphics card:
-// see LOT_SHADER below. If you change hardShare(), change it there too.
 
 // ---- Page text that depends on the configuration ---------------------------
-const pct = x => (x * 100).toFixed(1) + "%";
 document.getElementById("subtitle").textContent =
-  `Ordinary R1-1 lots, Vancouver. Soil holds ${D} mm (${SOIL_NAME}), so the ` +
-  (RAIN_LIMIT === null
-    ? `48 mm storm cannot be handled at any amount of hard surface.`
-    : `48 mm storm allows at most ${pct(RAIN_LIMIT)} hard surface.`);
+  `Impermeable materials: 0–${BYLAW_MAX_IMPERMEABLE_RATIO * 100}% (s. 3.2.2.8). ` +
+  `Buildings: max ${BYLAW_MAX_BUILDING_RATIO * 100}% site coverage (s. 3.2.2.7).`;
+document.querySelector(".building-cap span").textContent =
+  `${BYLAW_MAX_BUILDING_RATIO * 100}% maximum building coverage (s. 3.2.2.7)`;
+document.querySelector(".building-cap span").parentElement.style.setProperty(
+  "--building-cap-position",
+  `${BYLAW_MAX_BUILDING_RATIO / BYLAW_MAX_IMPERMEABLE_RATIO * 100}%`,
+);
 const notes = [
-  "Buildings: 2015 City data, may be out of date.",
-  "‘No paving’ counts roofs only — real lots also have driveways and patios.",
-  "Roof outlines include eaves, so roof area is a slight overestimate.",
-  "Parcels sharing an address and adjoining are treated as one zoning site, per the Section 2 definition of Site.",
-  "Rain City’s 48 mm is a City target, not a legal requirement for R1-1.",
+  `A site's measured 2015 roof share controls when its house appears. Building coverage may not exceed ${BYLAW_MAX_BUILDING_RATIO * 100}% of the site; the footprints are approximate and may be outdated.`,
+  "Roofs are included within the red impermeable share, not added on top of it. Red/blue shows the hypothetical material mix across the whole lot.",
+  `Water estimate assumes ${P} mm rainfall, ${Math.round(C * 100)}% runoff from impermeable surfaces, and ${D} mm storage in permeable soil (${SOIL_NAME}).`,
+  "The 48 mm storm is environmental context, not a zoning pass/fail test.",
+  "Zoom in to see each lot's material mix and roof share, or click a lot for bylaw status.",
+  "Adjoining parcels with a shared address are treated as one zoning site.",
 ];
 document.getElementById("notes").innerHTML = notes.map(n => `<li>${n}</li>`).join("");
-
-// Legend: the same colours as the map, drawn as a bar, with the limits marked.
-const Lp = LIMIT * 100;
-document.getElementById("legendBar").style.background = RAIN_LIMIT === null
-  ? `linear-gradient(to right, ${COLOR_OVER}, ${COLOR_FULL})`
-  : `linear-gradient(to right, ${COLOR_NONE} 0%, ${COLOR_AT_LIMIT} ${Lp}%, ` +
-    `${COLOR_OVER} ${Lp}%, ${COLOR_FULL} 100%)`;
 document.getElementById("greySwatch").style.background = COLOR_OUT;
-document.getElementById("roofSwatch").style.background =
-  matchMedia("(prefers-color-scheme: dark)").matches ? BUILDING_FILL_DARK : BUILDING_FILL;
-const ticks = [[0, "0%", "edge-l"], [1, "100%", "edge-r"],
-               [BYLAW_IMPERMEABLE_RATIO, `Bylaw<br>${pct(BYLAW_IMPERMEABLE_RATIO)}`, ""]];
-if (RAIN_LIMIT !== null)
-  ticks.push([RAIN_LIMIT, `Rain City limit<br>${pct(RAIN_LIMIT)}`, ""]);
-document.getElementById("legendTicks").innerHTML = ticks.map(([v, t, c]) =>
-  `<span class="${c}" style="left:${v * 100}%">${t}</span>`).join("");
+document.getElementById("impermeableSwatch").style.background = COLOR_IMPERMEABLE;
+document.getElementById("permeableSwatch").style.background = COLOR_PERMEABLE;
 
 
 // ---- The map ------------------------------------------------------------------
@@ -308,46 +246,30 @@ map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
 // ---- Drawing the lots on the graphics card -----------------------------------
-// WHY: the slider has to feel instant. Asking MapLibre to recolour 62,000
-// lots means it rebuilds its map tiles each time (about 0.3 s, more when
-// zoomed out). Instead, every lot is sent to the graphics card ONCE, with its
-// roof share, and the colour is worked out there from the slider position.
-// Moving the slider then only changes one number (u_t), so every lot
-// recolours on the very next frame, at any zoom.
-//
-// The code below is the colour rule written in the graphics card's language
-// (GLSL). It is the same rule as hardShare() and passes() above.
+// Each lot is sent once; the third vertex value places its north-south split.
+// Moving the slider changes only where red meets blue within each lot.
 const LOT_SHADER = {
   vertex: `
     attribute vec2 a_pos;      // lot corner, in map units, relative to ORIGIN
-    attribute float a_rs;      // the lot's roof share, 0-1
+    attribute float a_y;       // normalized north-to-south position in its lot
     attribute float a_sc;      // 0 = ordinary lot, anything else = outside scope
     uniform mat4 u_matrix;     // where the map camera is
-    uniform float u_t;         // the slider, 0 -> 1 -> 2
-    uniform float u_bylaw, u_limit, u_hasLimit, u_opacity;
-    uniform vec3 u_none, u_atLimit, u_over, u_full, u_out;
-    varying vec4 v_color;
+    varying float v_y, v_sc;
     void main() {
       gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
-      vec3 c;
-      if (a_sc > 0.5) {
-        c = u_out;                                   // outside scope: grey
-      } else {
-        float bylaw = max(u_bylaw, a_rs);            // never below the roofs
-        float meets = max(u_limit, a_rs);
-        float h = u_t <= 1.0 ? bylaw + (meets - bylaw) * u_t
-                             : meets + (a_rs - meets) * (u_t - 1.0);
-        if (u_hasLimit > 0.5 && h <= u_limit + 1e-6)
-          c = mix(u_none, u_atLimit, clamp(h / max(u_limit, 1e-3), 0.0, 1.0));
-        else
-          c = mix(u_over, u_full, clamp((h - u_limit) / max(1.0 - u_limit, 1e-3), 0.0, 1.0));
-      }
-      v_color = vec4(c * u_opacity, u_opacity);      // pre-multiplied, as MapLibre expects
+      v_y = a_y;
+      v_sc = a_sc;
     }`,
   fragment: `
     precision mediump float;
-    varying vec4 v_color;
-    void main() { gl_FragColor = v_color; }`,
+    uniform float u_hard, u_opacity;
+    uniform vec3 u_permeable, u_impermeable, u_out;
+    varying float v_y, v_sc;
+    void main() {
+      vec3 c = v_sc > 0.5 ? u_out
+             : (v_y >= 1.0 - u_hard ? u_impermeable : u_permeable);
+      gl_FragColor = vec4(c * u_opacity, u_opacity);
+    }`,
 };
 
 const hexToRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
@@ -358,24 +280,39 @@ const hexToRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 const ORIGIN = maplibregl.MercatorCoordinate.fromLngLat([-123.12, 49.25]);
 
 function buildLotMesh(features) {
-  const verts = [], idx = [];                // 4 numbers per corner: x, y, rs, sc
+  const verts = [], idx = [];                // 4 floats per corner; scope is the fourth
   for (const f of features) {
     const p = f.properties;
-    const rs = p.sc === 0 ? roofShare(p.A, p.r) : 0;
     const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates]
                 : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+    let minY = Infinity, maxY = -Infinity;
+    for (const rings of polys) {
+      for (const ring of rings) {
+        for (const [lng, lat] of ring) {
+          const m = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]);
+          minY = Math.min(minY, m.y);
+          maxY = Math.max(maxY, m.y);
+        }
+      }
+    }
+    const ySpan = Math.max(maxY - minY, 1e-12);
     for (const rings of polys) {
       const flat = [], holes = [];
       rings.forEach((ring, i) => {
-        if (i > 0) holes.push(flat.length / 2);
+        if (i > 0) holes.push(flat.length / 3);
         for (const [lng, lat] of ring) {
           const m = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]);
-          flat.push(m.x - ORIGIN.x, m.y - ORIGIN.y);
+          flat.push(m.x - ORIGIN.x, m.y - ORIGIN.y,
+                    (m.y - minY) / ySpan);
         }
       });
       const base = verts.length / 4;
-      for (let i = 0; i < flat.length; i += 2) verts.push(flat[i], flat[i + 1], rs, p.sc);
-      for (const k of earcut(flat, holes)) idx.push(base + k);
+      const triangleCoords = [];
+      for (let i = 0; i < flat.length; i += 3) {
+        verts.push(flat[i], flat[i + 1], flat[i + 2], p.sc);
+        triangleCoords.push(flat[i], flat[i + 1]);
+      }
+      for (const k of earcut(triangleCoords, holes)) idx.push(base + k);
     }
   }
   return { verts: new Float32Array(verts), idx: new Uint32Array(idx) };
@@ -402,8 +339,8 @@ function lotLayer(mesh) {
       gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, LOT_SHADER.vertex));
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
       gl.linkProgram(prog);
-      for (const u of ["u_matrix", "u_t", "u_bylaw", "u_limit", "u_hasLimit", "u_opacity",
-                       "u_none", "u_atLimit", "u_over", "u_full", "u_out"])
+      for (const u of ["u_matrix", "u_hard", "u_opacity",
+                       "u_permeable", "u_impermeable", "u_out"])
         loc[u] = gl.getUniformLocation(prog, u);
 
       // Our own "vertex array" so we never disturb MapLibre's drawing state.
@@ -412,7 +349,7 @@ function lotLayer(mesh) {
       gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
       ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.idx, gl.STATIC_DRAW);
-      [["a_pos", 2, 0], ["a_rs", 1, 8], ["a_sc", 1, 12]].forEach(([name, size, offset]) => {
+      [["a_pos", 2, 0], ["a_y", 1, 8], ["a_sc", 1, 12]].forEach(([name, size, offset]) => {
         const a = gl.getAttribLocation(prog, name);
         gl.enableVertexAttribArray(a);
         gl.vertexAttribPointer(a, size, gl.FLOAT, false, 16, offset);
@@ -426,15 +363,10 @@ function lotLayer(mesh) {
       for (let r = 0; r < 4; r++) m[12 + r] += ORIGIN.x * m[r] + ORIGIN.y * m[4 + r];
       gl.useProgram(prog);
       gl.uniformMatrix4fv(loc.u_matrix, false, m);
-      gl.uniform1f(loc.u_t, +slider.value);
-      gl.uniform1f(loc.u_bylaw, BYLAW_IMPERMEABLE_RATIO);
-      gl.uniform1f(loc.u_limit, LIMIT);
-      gl.uniform1f(loc.u_hasLimit, RAIN_LIMIT === null ? 0 : 1);
+      gl.uniform1f(loc.u_hard, +slider.value / 100);
       gl.uniform1f(loc.u_opacity, LOT_OPACITY);
-      gl.uniform3fv(loc.u_none, hexToRGB(COLOR_NONE));
-      gl.uniform3fv(loc.u_atLimit, hexToRGB(COLOR_AT_LIMIT));
-      gl.uniform3fv(loc.u_over, hexToRGB(COLOR_OVER));
-      gl.uniform3fv(loc.u_full, hexToRGB(COLOR_FULL));
+      gl.uniform3fv(loc.u_permeable, hexToRGB(COLOR_PERMEABLE));
+      gl.uniform3fv(loc.u_impermeable, hexToRGB(COLOR_IMPERMEABLE));
       gl.uniform3fv(loc.u_out, hexToRGB(COLOR_OUT));
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -445,61 +377,220 @@ function lotLayer(mesh) {
   };
 }
 
-// ---- Numbers for the summary --------------------------------------------------
-// Kept in plain arrays so the summary can be recounted on every slider move.
-let lotA, lotRS, n = 0;
+// Buildings are rendered by a second custom layer so visibility follows the
+// slider on the next frame without filtering/rebuilding the 100k-feature source.
+const BUILDING_SHADER = {
+  vertex: `
+    attribute vec2 a_pos;
+    attribute float a_rs;
+    uniform mat4 u_matrix;
+    varying float v_rs;
+    void main() {
+      gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+      v_rs = a_rs;
+    }`,
+  fragment: `
+    precision mediump float;
+    uniform float u_hard, u_maxImpermeable, u_opacity;
+    uniform vec3 u_color, u_warningColor;
+    varying float v_rs;
+    void main() {
+      if (u_hard + 0.00001 < v_rs && v_rs <= u_maxImpermeable + 0.00001) discard;
+      if (v_rs > u_maxImpermeable + 0.00001 && u_hard + 0.00001 < u_maxImpermeable)
+        discard;
+      vec3 color = v_rs > u_maxImpermeable + 0.00001 ? u_warningColor : u_color;
+      gl_FragColor = vec4(color * u_opacity, u_opacity);
+    }`,
+};
 
-function summarise(t) {
-  let pass = 0, hardM2 = 0, areaM2 = 0, blocked = 0;
-  for (let i = 0; i < n; i++) {
-    const h = hardShare(lotRS[i], t);
-    if (passes(h)) pass++;
-    if (RAIN_LIMIT !== null && lotRS[i] > RAIN_LIMIT + 1e-9) blocked++;
-    hardM2 += h * lotA[i];
-    areaM2 += lotA[i];
+function buildBuildingMesh(features) {
+  const verts = [], fillIndices = [], lineIndices = [];
+  for (const f of features) {
+    const rs = Number(f.properties.rs) || 0;
+    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates]
+                : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+    for (const rings of polys) {
+      const base = verts.length / 3;
+      const flat = [], holes = [];
+      for (const [ringIndex, ring] of rings.entries()) {
+        if (ringIndex > 0) holes.push(flat.length / 2);
+        const ringStart = flat.length / 2;
+        for (const [lng, lat] of ring) {
+          const m = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]);
+          flat.push(m.x - ORIGIN.x, m.y - ORIGIN.y);
+        }
+        for (let i = ringStart; i < flat.length / 2; i++) {
+          lineIndices.push(base + i, base + (i + 1 < flat.length / 2 ? i + 1 : ringStart));
+        }
+      }
+      for (let i = 0; i < flat.length; i += 2)
+        verts.push(flat[i], flat[i + 1], rs);
+      for (const i of earcut(flat, holes)) fillIndices.push(base + i);
+    }
   }
-  return { pass, fail: n - pass, hardShare: hardM2 / areaM2, blocked };
+  return {
+    verts: new Float32Array(verts),
+    fillIndices: new Uint32Array(fillIndices),
+    lineIndices: new Uint32Array(lineIndices),
+  };
 }
 
-// Numbers glide to their new value over a short moment instead of jumping.
-const shown = {};
-function glide(id, target, fmt) {
-  const el = document.getElementById(id);
-  const from = shown[id] ?? target;
-  const start = performance.now(), ms = 180;
-  shown[id] = target;
-  cancelAnimationFrame(el._raf);
-  const step = now => {
-    const k = Math.min(1, (now - start) / ms);
-    el.textContent = fmt(from + (target - from) * (1 - (1 - k) ** 3));
-    if (k < 1) el._raf = requestAnimationFrame(step);
+function buildingLayer(mesh) {
+  let prog, vao, fillIbo, lineIbo, loc = {}, gl2, vaoExt;
+  const compile = (gl, type, src) => {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+      throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
   };
-  el._raf = requestAnimationFrame(step);
+  return {
+    id: "building-footprints", type: "custom", renderingMode: "2d",
+    onAdd(map, gl) {
+      gl2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+      if (!gl2) gl.getExtension("OES_element_index_uint");
+      vaoExt = gl2 ? null : gl.getExtension("OES_vertex_array_object");
+      const bindVAO = v => gl2 ? gl.bindVertexArray(v) : vaoExt.bindVertexArrayOES(v);
+
+      prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, BUILDING_SHADER.vertex));
+      gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, BUILDING_SHADER.fragment));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+        throw new Error(gl.getProgramInfoLog(prog));
+      for (const u of ["u_matrix", "u_hard", "u_maxImpermeable", "u_opacity",
+                       "u_color", "u_warningColor"])
+        loc[u] = gl.getUniformLocation(prog, u);
+
+      vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
+      bindVAO(vao);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
+      const position = gl.getAttribLocation(prog, "a_pos");
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 12, 0);
+      const roofShare = gl.getAttribLocation(prog, "a_rs");
+      gl.enableVertexAttribArray(roofShare);
+      gl.vertexAttribPointer(roofShare, 1, gl.FLOAT, false, 12, 8);
+      fillIbo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fillIbo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.fillIndices, gl.STATIC_DRAW);
+      lineIbo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIbo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.lineIndices, gl.STATIC_DRAW);
+      bindVAO(null);
+    },
+    render(gl, matrix) {
+      if (map.getZoom() < BUILDINGS_MIN_ZOOM) return;
+      const m = Array.from(matrix);
+      for (let r = 0; r < 4; r++) m[12 + r] += ORIGIN.x * m[r] + ORIGIN.y * m[4 + r];
+      gl.useProgram(prog);
+      gl.uniformMatrix4fv(loc.u_matrix, false, m);
+      gl.uniform1f(loc.u_hard, +slider.value / 100);
+      gl.uniform1f(loc.u_maxImpermeable, BYLAW_MAX_IMPERMEABLE_RATIO);
+      gl.uniform1f(loc.u_opacity, 0.95);
+      gl.uniform3fv(loc.u_color, hexToRGB(dark ? "#6b6a65" : "#3d3d3a"));
+      gl.uniform3fv(loc.u_warningColor, hexToRGB("#d97706"));
+      gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl2 ? gl.bindVertexArray(vao) : vaoExt.bindVertexArrayOES(vao);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fillIbo);
+      gl.drawElements(gl.TRIANGLES, mesh.fillIndices.length, gl.UNSIGNED_INT, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIbo);
+      gl.drawElements(gl.LINES, mesh.lineIndices.length, gl.UNSIGNED_INT, 0);
+      gl2 ? gl.bindVertexArray(null) : vaoExt.bindVertexArrayOES(null);
+    },
+  };
 }
+
+// ---- Site-wide water estimate -----------------------------------------------
+let lotA, lotRoofShares, n = 0, totalArea = 0;
+let overBuildingCount = 0, overImpermeableCount = 0;
+let selectedLot = null, popup = null;
+
+function waterHeldM3(areaM2, hardShare) {
+  const hardArea = areaM2 * hardShare;
+  const permeableArea = areaM2 - hardArea;
+  // Retention is the stormwater reaching permeable ground, capped by its soil storage.
+  const stormwaterM3 = (P * permeableArea + P * C * hardArea) / 1000;
+  const soilCapacityM3 = D * permeableArea / 1000;
+  return Math.min(stormwaterM3, soilCapacityM3);
+}
+
+function summarise(hardShare) {
+  let heldM3 = 0;
+  for (let i = 0; i < n; i++) heldM3 += waterHeldM3(lotA[i], hardShare);
+  return heldM3;
+}
+
 const int = x => Math.round(x).toLocaleString("en-CA");
 
-function positionText(t) {
-  if (t < 0.005) return "At: Bylaw today";
-  if (Math.abs(t - 1) < 0.005) return "At: Meets Rain City";
-  if (t > 1.995) return "At: No paving (roofs only)";
-  return t < 1 ? "Between Bylaw today and Meets Rain City"
-               : "Between Meets Rain City and No paving";
+function roofShareFor(lot) {
+  const area = Number(lot.properties.A);
+  return area > 0 ? Number(lot.properties.r || 0) / area : 0;
 }
 
-// Slider -> numbers and map colours, both on the very next frame.
+function renderPopup() {
+  if (!selectedLot || !popup) return;
+  const area = Number(selectedLot.properties.A);
+  const roofShare = roofShareFor(selectedLot);
+  const hardShare = +slider.value / 100;
+  const hardArea = area * hardShare;
+  const permeableArea = area - hardArea;
+  const content = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = selectedLot.properties.ad || "R1-1 lot";
+  content.append(title);
+  const details = document.createElement("div");
+  const buildingStatus = roofShare > BYLAW_MAX_BUILDING_RATIO
+    ? "Building coverage exceeds the 50% limit"
+    : "Building coverage is within the 50% limit";
+  const totalStatus = roofShare > BYLAW_MAX_IMPERMEABLE_RATIO
+    ? "Roof cannot fit within the 75% impermeable-material limit"
+    : "Roof fits within the 75% impermeable-material limit";
+  details.textContent =
+    `Lot area: ${area.toFixed(1)} m² · Building coverage: ${(roofShare * 100).toFixed(1)}% ` +
+    `(${BYLAW_MAX_BUILDING_RATIO * 100}% max; ` +
+    `${buildingStatus}) · ${totalStatus} · ` +
+    `Impermeable: ${slider.value}% (${hardArea.toFixed(1)} m²) · ` +
+    `Permeable: ${100 - +slider.value}% (${permeableArea.toFixed(1)} m²) · ` +
+    `Water held: ${waterHeldM3(area, hardShare).toFixed(2)} m³`;
+  content.append(details);
+  popup.setDOMContent(content);
+}
+
+// Slider -> percentages, water estimate and map colour.
 const slider = document.getElementById("slider");
+slider.max = String(BYLAW_MAX_IMPERMEABLE_RATIO * 100);
+const maximumStop = document.getElementById("maximumStop");
+maximumStop.dataset.t = slider.max;
+maximumStop.innerHTML = `${slider.max}% hardscape<br>bylaw maximum`;
 function update() {
   if (n === 0) return;             // lots not loaded yet
-  const t = +slider.value;
-  const s = summarise(t);
-  glide("hsPct", s.hardShare * 100, x => x.toFixed(1) + "%");
-  glide("passN", s.pass, int);
-  glide("failN", s.fail, int);
-  document.getElementById("position").textContent = positionText(t);
-  document.getElementById("blocked").textContent = RAIN_LIMIT === null
-    ? `At ${D} mm the soil holds less than the rain that falls on it, so no lot can pass.`
-    : `${int(s.blocked)} of the ${int(n)} lots can never pass: their roofs alone ` +
-      `already cover more than ${pct(RAIN_LIMIT)}.`;
+  const hardPct = +slider.value;
+  const heldM3 = summarise(hardPct / 100);
+  const overImpermeablePct = n > 0 ? (overImpermeableCount / n * 100).toFixed(2) : "0.00";
+  document.getElementById("impermeablePct").textContent = `${hardPct}%`;
+  document.getElementById("permeablePct").textContent = `${100 - hardPct}%`;
+  document.getElementById("ruleStatus").innerHTML =
+    `<strong>Bylaw status</strong>${hardPct}% total impermeable material is ` +
+    `${hardPct <= BYLAW_MAX_IMPERMEABLE_RATIO * 100 ? "within" : "over"} the 75% limit. ` +
+    `${overBuildingCount.toLocaleString("en-CA")} lots have roofs over the 50% building limit; ` +
+    `${overImpermeableCount.toLocaleString("en-CA")} of ${n.toLocaleString("en-CA")} lots ` +
+    `(${overImpermeablePct}%) have roofs above 75%; their footprints turn orange at the slider maximum.`;
+  map.setLayoutProperty("material-percentage-labels", "text-field", [
+    "concat",
+    `P ${100 - hardPct} / I ${hardPct} · Roof `,
+    ["to-string", ["round", ["*", 100, ["/", ["get", "r"], ["get", "A"]]]]],
+    "%",
+  ]);
+  document.getElementById("waterHeld").textContent = heldM3.toLocaleString("en-CA", {
+    maximumFractionDigits: 1,
+  });
+  document.getElementById("waterScope").textContent =
+    `Environmental estimate across ${int(n)} ordinary R1-1 lots (${int(totalArea)} m²); not a bylaw pass/fail test`;
+  renderPopup();
   map.triggerRepaint();          // the lot layer reads the slider as it draws
 }
 slider.addEventListener("input", update);
@@ -515,20 +606,24 @@ map.on("load", async () => {
     data = await (await fetch(DATA_FILE)).json();
   } catch (e) {
     document.getElementById("loading").textContent =
-      `Could not load ${DATA_FILE}. Run buildings.py first, and open this page ` +
+      `Could not load ${DATA_FILE}. Run python3 buildings.py from the project root to generate all lot and house data, then open this page ` +
       `through  python3 -m http.server  (see the top of this file).`;
     return;
   }
-  // Only ordinary lots (sc = 0) go into the counts; the rest are drawn grey.
+  // Only ordinary lots (sc = 0) go into the water total; the rest are drawn grey.
   const inScope = data.features.filter(f => f.properties.sc === 0);
   n = inScope.length;
-  lotA = new Float64Array(n); lotRS = new Float64Array(n);
+  lotA = new Float64Array(n);
+  lotRoofShares = new Float64Array(n);
   inScope.forEach((f, i) => {
-    lotA[i] = f.properties.A;
-    lotRS[i] = roofShare(f.properties.A, f.properties.r);
+    lotA[i] = Number(f.properties.A);
+    lotRoofShares[i] = roofShareFor(f);
+    if (lotRoofShares[i] > BYLAW_MAX_BUILDING_RATIO) overBuildingCount++;
+    if (lotRoofShares[i] > BYLAW_MAX_IMPERMEABLE_RATIO) overImpermeableCount++;
+    totalArea += lotA[i];
   });
 
-  // The outlines and labels still come from MapLibre; they never change.
+  // Keep the lot features available for edge rendering and click details.
   map.addSource("lots", { type: "geojson", data });
   // The basemap draws its own buildings (from OpenStreetMap). They are not
   // the 2015 City roofs this page counts, so hide them to avoid confusion.
@@ -537,6 +632,22 @@ map.on("load", async () => {
   // The basemap's first text layer: our lots go underneath it.
   const firstLabel = map.getStyle().layers.find(l => l.type === "symbol")?.id;
   map.addLayer(lotLayer(buildLotMesh(data.features)), firstLabel);
+  // A transparent hit target lets users click individual lots for exact values.
+  map.addLayer({ id: "lot-hit-area", type: "fill", source: "lots",
+    paint: { "fill-color": "#000000", "fill-opacity": 0.02 } }, firstLabel);
+  map.on("click", "lot-hit-area", event => {
+    const feature = event.features?.find(f => f.properties.sc === 0);
+    if (!feature) return;
+    popup?.remove();
+    selectedLot = feature;
+    popup = new maplibregl.Popup({ closeButton: true, closeOnClick: false })
+      .setLngLat(event.lngLat)
+      .addTo(map);
+    popup.on("close", () => { popup = null; selectedLot = null; });
+    renderPopup();
+  });
+  map.on("mouseenter", "lot-hit-area", () => { map.getCanvas().style.cursor = "pointer"; });
+  map.on("mouseleave", "lot-hit-area", () => { map.getCanvas().style.cursor = ""; });
   // A thin line in the page colour between neighbouring lots, so each lot
   // reads on its own. Merged sites have no internal line: they are one shape.
   map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
@@ -554,32 +665,37 @@ map.on("load", async () => {
     minzoom: 16,
     paint: { "text-color": dark ? "#f0efec" : "#1f1f1d",
              "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
+  map.addLayer({ id: "material-percentage-labels", type: "symbol", source: "lots",
+    filter: ["==", ["get", "sc"], 0],
+    layout: {
+      "text-field": [
+        "concat",
+        `P ${100 - +slider.value} / I ${slider.value} · Roof `,
+        ["to-string", ["round", ["*", 100, ["/", ["get", "r"], ["get", "A"]]]]],
+        "%",
+      ],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": 8,
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+      "symbol-placement": "point",
+    },
+    minzoom: 18,
+    paint: { "text-color": dark ? "#f0efec" : "#1f1f1d",
+             "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
 
   document.getElementById("loading").remove();
   slider.disabled = false;
   update();
 
-  // Building outlines: loaded AFTER the lots, so the slider works at once.
-  // They are drawn whole (not split at lot lines) and never change with the
-  // slider. Each outline also carries a height (h, with src L = 2009 LiDAR,
-  // P = placeholder) for future 3D models; this flat map does not use it.
+  // Show each 2015 house only once the slider reaches its site's roof share.
   try {
-    const buildings = await (await fetch(BUILDINGS_FILE)).json();
-    map.addSource("buildings", { type: "geojson", data: buildings });
-    // Roofs are hard surface at every slider position (no lot's hard surface
-    // ever drops below its roofs), so they are filled in one fixed colour and
-    // the lot's colour shows on the ground around them.
-    map.addLayer({ id: "building-fill", type: "fill", source: "buildings",
-      minzoom: BUILDINGS_MIN_ZOOM,
-      paint: { "fill-color": dark ? BUILDING_FILL_DARK : BUILDING_FILL, "fill-opacity": 0.95 } },
-      "labels");
-    map.addLayer({ id: "building-outlines", type: "line", source: "buildings",
-      minzoom: BUILDINGS_MIN_ZOOM,
-      paint: { "line-color": dark ? "#f0efec" : "#1f1f1d", "line-opacity": 0.8,
-               "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.4, 18, 1.6] } },
-      "labels");
+    const response = await fetch(BUILDINGS_FILE);
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    const buildings = await response.json();
+    map.addLayer(buildingLayer(buildBuildingMesh(buildings.features)), "labels");
   } catch (e) {
-    console.warn(`Could not load ${BUILDINGS_FILE}; building outlines not shown.`, e);
+    console.warn(`Could not load ${BUILDINGS_FILE}; building footprints are not shown. Run python3 buildings.py to generate them.`, e);
   }
 });
 </script>
