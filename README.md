@@ -71,11 +71,15 @@ lots. The footprints include eaves and are approximate. The slider shows a
 hypothetical total impermeable share; it is not a survey of existing paving or
 a combined by-law compliance test.
 
-The full lot and 2015 building-footprint GeoJSON files are generated locally
-and are not committed (`map/data/` is ignored because the outputs are large).
-If `r11_stormwater.geojson` is missing, first run `python3 stormwater.py`, then
-run `python3 buildings.py` from the repository root before opening
-`map/index.html`; this restores the complete lot map and house overlays.
+The lot and 2015 building-footprint GeoJSON files in `map/data/` are generated
+by `buildings.py` from City data. A snapshot is published with the Pages site so
+visitors do not need to run the geospatial pipeline. To refresh the local data,
+run `python3 stormwater.py` if `r11_stormwater.geojson` is missing, then run
+`python3 buildings.py` from the repository root.
+
+## Live map
+
+The browser version is published at [the live R1-1 hard surface map](https://kevinjinn6.github.io/arch540-impermeable-materials/). The map and basemap require an internet connection. The published data is a snapshot; refresh it with `buildings.py` and commit the regenerated files when updating the map.
 
 ---
 
