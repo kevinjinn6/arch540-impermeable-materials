@@ -18,17 +18,10 @@ between what the words suggest and what the by-law means is what the tool is for
 
 ## Current state
 
-**Week 2 of 4.** Source selected and read; two prototypes built; no Rhino
-connection yet. Nothing here is a finished submission.
-
-| Deliverable | Where | State |
-|---|---|---|
-| W1 — README and first-week materials | this file, `week-01/` | Complete |
-| W1 — preferred regulation and two ranked alternatives | [`docs/regulation-shortlist.md`](docs/regulation-shortlist.md) | Complete |
-| W1 — comparison of prompt approaches | [`docs/prompt-comparison.md`](docs/prompt-comparison.md) | Two of three approaches; the shortfall is stated in the document |
-| W2 — source interpretation | — | Not started |
-| W3 — working tool with Rhino output | `stormwater.py` is a partial, oversized precursor | Needs cutting down |
-| W4 — reusable skill, testing, peer review | — | Not started |
+The interactive map is the current tool. It tests a hypothetical
+impermeable-material share on R1-1 lots and reports mapped roof coverage
+separately. The map is illustrative, not a site-specific compliance finding;
+its datasets are generated locally as described below.
 
 ---
 
