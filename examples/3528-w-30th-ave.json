@@ -1,0 +1,110 @@
+{
+ "site": {
+  "address": "3528 W 30th Ave",
+  "zone": "R1-1",
+  "site_id": "006141498",
+  "frontage_m": 15.2,
+  "outline": [
+   [
+    15.2009,
+    0.0
+   ],
+   [
+    15.2007,
+    0.02
+   ],
+   [
+    15.2009,
+    39.6115
+   ],
+   [
+    0.0004,
+    39.6076
+   ],
+   [
+    0.0,
+    0.0361
+   ],
+   [
+    0.0003,
+    0.0061
+   ]
+  ],
+  "frame_note": "City parcel polygon (property-parcel-polygons), reprojected to EPSG:26910 and rotated 0.505 deg so the lot sits square to the grid. North, and W 30th Ave, are at the top (+y); the lane is at y = 0. Units: metres."
+ },
+ "use": "single detached house",
+ "name": "As designed: permeable-paver parking pad",
+ "surfaces": [
+  {
+   "id": "house",
+   "label": "House",
+   "material": "building",
+   "rect": [
+    1.2,
+    11.7,
+    12.8,
+    23.0
+   ]
+  },
+  {
+   "id": "patio",
+   "label": "Rear patio",
+   "material": "stone",
+   "rect": [
+    1.2,
+    7.7,
+    10.0,
+    4.0
+   ]
+  },
+  {
+   "id": "deck",
+   "label": "Rear deck",
+   "material": "wood decking",
+   "rect": [
+    11.2,
+    7.7,
+    2.8,
+    4.0
+   ],
+   "spaced": true,
+   "on_grade": true,
+   "impermeable_layer": false,
+   "height_mm": 150
+  },
+  {
+   "id": "walk_front",
+   "label": "Front walk",
+   "material": "concrete",
+   "rect": [
+    6.85,
+    34.7,
+    1.5,
+    4.912
+   ]
+  },
+  {
+   "id": "walk_side",
+   "label": "Side walk",
+   "material": "concrete",
+   "rect": [
+    14.15,
+    11.7,
+    0.9,
+    23.0
+   ]
+  },
+  {
+   "id": "pad",
+   "label": "Parking pad",
+   "material": "permeable pavers",
+   "rect": [
+    1.6,
+    0.0,
+    12.0,
+    7.7
+   ]
+  }
+ ],
+ "view_name": "as designed"
+}

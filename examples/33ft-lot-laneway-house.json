@@ -1,0 +1,36 @@
+{
+ "site": {
+  "address": "33 ft lot (illustrative)",
+  "zone": "R1-1",
+  "frontage_m": 10.06,
+  "parking_spaces": 1,
+  "outline": [[0.0, 0.0], [10.06, 0.0], [10.06, 37.19], [0.0, 37.19]],
+  "frame_note": "A standard 33 x 122 ft Vancouver interior lot, 10.06 x 37.19 m, drawn square. Not a real parcel. North and the street are at the top (+y); the lane is at y = 0. Units: metres."
+ },
+ "use": "single detached house",
+ "name": "33 ft lot with laneway house: pavers front to back",
+ "view_name": "laneway lot",
+ "surfaces": [
+  {"id": "house", "label": "House", "material": "building",
+   "rect": [1.2, 14.5, 8.0, 12.5]},
+  {"id": "porch", "label": "Front porch", "material": "porch",
+   "rect": [3.5, 27.0, 3.0, 1.5]},
+  {"id": "laneway", "label": "Laneway house", "material": "laneway house",
+   "rect": [0.9, 0.9, 6.0, 7.0]},
+  {"id": "pad", "label": "Parking pad + lane apron", "material": "permeable pavers",
+   "rect": [6.9, -1.5, 3.16, 9.4], "parking": true},
+  {"id": "court", "label": "Courtyard", "material": "permeable pavers",
+   "rect": [1.2, 7.9, 7.66, 6.6]},
+  {"id": "deck", "label": "Raised deck", "material": "wood decking",
+   "rect": [1.2, 7.9, 3.0, 3.0],
+   "spaced": true, "on_grade": false, "impermeable_layer": false, "height_mm": 900},
+  {"id": "walk_front", "label": "Front walk", "material": "concrete",
+   "rect": [4.5, 27.0, 1.2, 10.19]},
+  {"id": "walk_side", "label": "Side walk", "material": "concrete",
+   "rect": [9.2, 14.5, 0.86, 12.5]},
+  {"id": "hottub", "label": "Hot tub (from the schedule)", "material": "hot tub",
+   "area_m2": 4.5},
+  {"id": "play", "label": "Play area", "material": "artificial turf",
+   "rect": [1.2, 29.0, 3.0, 4.0]}
+ ]
+}

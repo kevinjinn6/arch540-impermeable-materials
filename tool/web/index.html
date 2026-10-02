@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R1-1 Impermeable Materials</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/*
+  R1-1 s.3.2.2.8 -- the browser version of tool/impermeable_check.py.
+  Palette and drawing conventions follow the W1 prototype
+  (week-01/prompt-b-high-context/HANDOFF.md): drafting-sheet greys, survey-ink
+  navy, permeable = moss green, impermeable = graphite, limit = burnt orange,
+  coverage bars drawn as dimension strings with the limit as a tick.
+  One deliberate light "drawing sheet" look; every colour is set explicitly.
+*/
+:root {
+  --paper: #e8ebe6;
+  --sheet: #f5f6f2;
+  --rule: #c7cdc4;
+  --rule-2: #dde1da;
+  --ink: #1e2a44;          /* survey-ink navy: text and lines */
+  --ink-2: #4b556b;
+  --ink-3: #6f7788;
+  --building: #263456;
+  --graphite: #4e5054;
+  --moss: #68843e;
+  --ground: #c4d4aa;
+  --limit: #cc5500;        /* burnt orange */
+  --pass: #2e7d32;
+  --fail: #c62828;
+  --flag: #8a5a00;
+  --discrepancy: #fff1e6;
+  --viewport: #d9ddd6;
+  --focus: #cc5500;
+  --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--paper); color: var(--ink); }
+body { font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+.page { max-width: 1320px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 40px;
+        display: flex; flex-direction: column; gap: 16px; }
+
+/* ---- title block ---------------------------------------------------------- */
+.titleblock { display: grid; grid-template-columns: 1fr auto; gap: 8px 24px; align-items: end;
+              border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+.eyebrow { font-stretch: 80%; font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase;
+           color: var(--ink-2); font-weight: 600; }
+h1 { margin: 2px 0 0; font-size: clamp(26px, 3.4vw, 38px); line-height: 1.05; font-weight: 700;
+     font-stretch: 75%; letter-spacing: -.005em; text-wrap: balance; }
+.provision { margin: 0; max-width: 46ch; font-size: 13px; color: var(--ink-2); text-align: right; }
+.provision q { color: var(--ink); font-weight: 600; quotes: "\201C" "\201D"; }
+.provision .ref { font-family: var(--mono); font-size: 11.5px; }
+
+/* ---- two-column drawing sheet -------------------------------------------- */
+.grid { display: grid; grid-template-columns: 372px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: 1fr; }
+  .titleblock { grid-template-columns: 1fr; } .provision { text-align: left; } }
+.panel { background: var(--sheet); border: 1px solid var(--rule); }
+.panel-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+           padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.panel-h h2 { margin: 0; font-size: 12px; font-stretch: 80%; letter-spacing: .09em;
+              text-transform: uppercase; font-weight: 700; }
+.panel-b { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.hint { color: var(--ink-3); font-size: 12px; margin: 0; }
+
+/* ---- controls ------------------------------------------------------------- */
+button, select, input, textarea { font: inherit; color: var(--ink); }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--ink); width: fit-content; }
+.seg button { background: transparent; border: 0; padding: 6px 12px; font-size: 13px;
+              font-stretch: 85%; font-weight: 600; letter-spacing: .02em; }
+.seg button + button { border-left: 1px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+.btn { background: var(--sheet); border: 1px solid var(--ink); padding: 6px 12px; font-size: 13px;
+       font-weight: 600; font-stretch: 85%; }
+.btn:hover { background: var(--ink); color: var(--sheet); }
+.btn.quiet { border-color: var(--rule); font-weight: 500; }
+.btn.quiet:hover { background: var(--rule-2); color: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ---- the schedule of surfaces --------------------------------------------- */
+.schedule { display: flex; flex-direction: column; }
+.surface { border-top: 1px solid var(--rule-2); padding: 10px 14px 12px; display: grid;
+           grid-template-columns: 10px 1fr auto; gap: 6px 10px; align-items: center; }
+.surface:first-child { border-top: 0; }
+.surface[aria-current="true"] { background: #eceee7; box-shadow: inset 3px 0 0 var(--limit); }
+.swatch { width: 10px; height: 10px; border: 1px solid rgba(0,0,0,.35); align-self: center; }
+.surface .name { border: 0; border-bottom: 1px solid transparent; background: transparent;
+                 font-weight: 600; padding: 1px 0; min-width: 0; width: 100%; }
+.surface .name:hover, .surface .name:focus { border-bottom-color: var(--rule); }
+.area { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right;
+        white-space: nowrap; }
+.surface .fields { grid-column: 2 / 4; display: grid; grid-template-columns: 1fr; gap: 6px; }
+.surface select { width: 100%; padding: 4px 6px; border: 1px solid var(--rule); background: #fff; }
+.dims { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.dims label, .cond label.num { display: flex; flex-direction: column; font-size: 10.5px; color: var(--ink-3);
+             letter-spacing: .04em; text-transform: uppercase; font-stretch: 85%; gap: 2px; }
+.dims input, .cond input[type="number"] { width: 100%; padding: 3px 5px; border: 1px solid var(--rule);
+             background: #fff; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.cond { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; padding: 6px 8px;
+        background: #eef0ea; border-left: 2px solid var(--moss); }
+.cond label { display: inline-flex; gap: 5px; align-items: center; }
+.cond label.num { flex-direction: row; align-items: center; text-transform: none; font-size: 12.5px;
+                  color: var(--ink); letter-spacing: 0; }
+.cond label.num input { width: 78px; }
+.chip { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+        text-transform: uppercase; font-stretch: 80%; padding: 2px 6px; border: 1px solid currentColor;
+        white-space: nowrap; }
+.chip.building { color: var(--building); }
+.chip.impermeable { color: var(--graphite); }
+.chip.permeable { color: var(--moss); }
+.chip.ground { color: var(--ink-3); }
+.chip.flagged { color: var(--flag); }
+.del { background: none; border: 0; color: var(--ink-3); font-size: 18px; line-height: 1; padding: 0 2px; }
+.del:hover { color: var(--fail); }
+.rest { padding: 10px 14px; border-top: 1px dashed var(--rule); display: grid;
+        grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; color: var(--ink-2); }
+
+/* ---- verdict --------------------------------------------------------------- */
+.verdict { display: grid; grid-template-columns: minmax(170px, 250px) minmax(0, 1fr); gap: 14px 28px;
+           align-items: center; padding: 16px 18px; }
+@media (max-width: 620px) { .verdict { grid-template-columns: 1fr; } }
+.big { display: flex; flex-direction: column; gap: 4px; min-width: 190px; }
+.pct { font-family: var(--mono); font-size: 44px; font-weight: 500; line-height: 1; letter-spacing: -.02em;
+       font-variant-numeric: tabular-nums; }
+.pill { font-weight: 700; font-stretch: 80%; letter-spacing: .1em; text-transform: uppercase;
+        color: #fff; padding: 3px 10px; width: fit-content; font-size: 14px; }
+.pill.pass { background: var(--pass); } .pill.fail { background: var(--fail); } .pill.na { background: var(--ink-3); }
+.margin { font-size: 13px; color: var(--ink-2); }
+.bars { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.bar-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+.bar-label b { color: var(--ink); font-weight: 600; }
+.bar-label .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+svg.dimbar { width: 100%; height: 40px; display: block; overflow: visible; }
+.surprise { grid-column: 1 / -1; margin: 0; padding: 8px 12px; background: #eef0ea; border-left: 3px solid var(--limit);
+            font-size: 13px; }
+.warnings { grid-column: 1 / -1; margin: 0; padding: 8px 12px 8px 28px; background: var(--discrepancy);
+            border-left: 3px solid var(--flag); font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; }
+
+/* ---- viewport ------------------------------------------------------------- */
+.viewport { position: relative; height: 480px; background: var(--viewport); border-top: 1px solid var(--rule);
+            overflow: hidden; touch-action: none; }
+@media (max-width: 620px) { .viewport { height: 380px; } }
+.viewport canvas { display: block; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+           padding: 8px 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.lbl { font-size: 11px; line-height: 1.2; color: var(--ink); background: rgba(245,246,242,.86);
+       padding: 2px 5px; white-space: nowrap; text-align: center; border: 1px solid rgba(30,42,68,.12); }
+.lbl b { font-weight: 700; }
+.lbl .m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.lbl.dark { background: rgba(30,42,68,.82); color: #fff; border-color: transparent; }
+.lbl.plain { background: none; border: 0; color: var(--ink-2); font-stretch: 85%; letter-spacing: .04em; }
+.lbl.limit { color: var(--limit); font-weight: 700; border-color: rgba(204,85,0,.35); }
+.lbl.verdict-lbl { font-size: 15px; font-weight: 700; padding: 3px 8px; color: #fff; }
+.lbl.sel { outline: 2px solid var(--limit); }
+.nogl { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center;
+        color: var(--ink-2); }
+
+/* ---- explain -------------------------------------------------------------- */
+.explain { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 14px 18px 18px; }
+@media (max-width: 760px) { .explain { grid-template-columns: 1fr; } }
+.explain h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; font-stretch: 85%; text-wrap: balance; }
+.explain p { margin: 0 0 8px; max-width: 65ch; }
+.passage { margin: 0; padding: 10px 12px; background: #fff; border: 1px solid var(--rule);
+           font-size: 13px; max-width: 65ch; }
+.passage cite { display: block; margin-top: 6px; font-style: normal; font-size: 11.5px; color: var(--ink-3);
+                font-family: var(--mono); }
+.flagline { color: var(--flag); font-weight: 600; }
+
+/* ---- reuse ---------------------------------------------------------------- */
+details.json summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+details.json textarea { width: 100%; height: 150px; font-family: var(--mono); font-size: 11.5px;
+                        border: 1px solid var(--rule); padding: 6px; margin-top: 8px; }
+.err { color: var(--fail); font-size: 12.5px; margin: 0; }
+.ok { color: var(--pass); font-size: 12.5px; margin: 0; }
+
+/* ---- footer ---------------------------------------------------------------- */
+footer { display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between;
+         border-top: 1px solid var(--rule); padding-top: 10px; font-size: 12px; color: var(--ink-2); }
+.parity b { font-weight: 700; }
+.parity.good b { color: var(--pass); }
+.parity.bad { color: var(--fail); }
+.banner { background: var(--fail); color: #fff; padding: 10px 14px; font-weight: 600; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---- additions, 2026-10-02 ------------------------------------------------ */
+.lotdims { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; align-items: end; }
+.lotdims label { display: flex; flex-direction: column; font-size: 10.5px; color: var(--ink-3);
+                 letter-spacing: .04em; text-transform: uppercase; font-stretch: 85%; gap: 2px; }
+.lotdims label:first-child { grid-column: 1 / -1; }
+.lotdims input { width: 100%; padding: 4px 6px; border: 1px solid var(--rule); background: #fff;
+                 font-family: var(--mono); font-size: 12.5px; }
+.notes { grid-column: 1 / -1; margin: 0; padding: 8px 12px 8px 28px; background: #eef0ea;
+         border-left: 3px solid var(--moss); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+.pct.whatif { color: var(--ink-3); text-decoration: underline dotted; }
+.surprise label { display: block; cursor: pointer; }
+.surprise input { margin-right: 6px; }
+.cond select { padding: 2px 4px; border: 1px solid var(--rule); background: #fff; font-size: 12px; }
+.chip.flagged[title] { cursor: help; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="banner" id="parity-banner" hidden></div>
+
+  <header class="titleblock">
+    <div>
+      <div class="eyebrow">Vancouver Zoning and Development By-law &middot; R1-1 District Schedule &middot; June 2026</div>
+      <h1>R1-1 Impermeable Materials</h1>
+    </div>
+    <p class="provision">
+      <span class="ref">s.3.2.2.8</span>
+      <q>Maximum area of impermeable materials 75% of the site area</q>
+      &mdash; and under s.4.2.2 that total includes the buildings.
+    </p>
+  </header>
+
+  <div class="grid">
+    <!-- ======================= INPUTS: the lot and its schedule ======================= -->
+    <aside class="panel" aria-label="Design inputs">
+      <div class="panel-h"><h2>Example</h2></div>
+      <div class="panel-b">
+        <div class="seg" role="group" aria-label="Choose an example" id="example-seg"></div>
+        <p class="hint" id="example-note"></p>
+      </div>
+
+      <div class="panel-h"><h2>The lot</h2><span class="hint mono" id="site-area"></span></div>
+      <div class="panel-b">
+        <p class="hint" id="lot-note"></p>
+        <div class="lotdims">
+          <label>address<input type="text" id="lot-address" placeholder="e.g. 3528 W 30th Ave"></label>
+          <label>width (m)<input type="number" id="lot-width" step="0.01" min="1" inputmode="decimal"></label>
+          <label>depth (m)<input type="number" id="lot-depth" step="0.01" min="1" inputmode="decimal"></label>
+          <button class="btn quiet" id="lot-apply" type="button">Use this rectangle</button>
+        </div>
+        <p class="hint">Metres. A lot that is not a rectangle, or a site of several parcels, is entered as JSON below.</p>
+      </div>
+
+      <div class="panel-h"><h2>Surfaces on the lot</h2></div>
+      <div class="schedule" id="schedule"></div>
+      <div class="panel-b">
+        <div class="row">
+          <button class="btn" id="add-surface" type="button">Add a surface</button>
+        </div>
+        <p class="hint">Rectangles in metres. <b>x</b> runs east from the lot&rsquo;s west line,
+          <b>y</b> runs north from the lane. Wood is decided by its conditions, not its name
+          (the author&rsquo;s reading of Section 2); say what is true, or leave a condition
+          unstated and the surface is counted as wood until you do.</p>
+        <details class="json">
+          <summary>Try another lot: copy or paste a design as JSON</summary>
+          <div class="row" style="margin-top:8px">
+            <button class="btn quiet" id="copy-json" type="button">Copy this design</button>
+            <button class="btn quiet" id="load-json" type="button">Load the text below</button>
+          </div>
+          <label for="json-text" class="hint" style="display:block;margin-top:8px">Same format as
+            <span class="mono">examples/*.json</span> in the repository. Feet are accepted with
+            <span class="mono">"units": "ft"</span>; a surface from an area schedule can be given as
+            <span class="mono">"area_m2"</span> instead of a rectangle.</label>
+          <textarea id="json-text" spellcheck="false"></textarea>
+          <p id="json-msg" class="hint" aria-live="polite"></p>
+        </details>
+      </div>
+    </aside>
+
+    <!-- ======================= RESULT and DRAWING ======================= -->
+    <section class="panel" aria-label="Result">
+      <div class="verdict" id="verdict" aria-live="polite"></div>
+
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" id="view-plan" aria-pressed="true">Plan</button>
+          <button type="button" id="view-axon" aria-pressed="false">Axon</button>
+        </div>
+        <div class="legend" aria-label="Colour key: what the by-law counts">
+          <span><i class="swatch" style="background:var(--building)"></i>Building (counts)</span>
+          <span><i class="swatch" style="background:var(--graphite)"></i>Impermeable (counts)</span>
+          <span><i class="swatch" style="background:var(--moss)"></i>Permeable</span>
+          <span><i class="swatch" style="background:var(--ground)"></i>Nothing drawn: not counted</span>
+          <span><i class="swatch" style="background:var(--fail)"></i>Outside the lot: not counted</span>
+          <span><i class="swatch" style="background:var(--limit)"></i>75% limit</span>
+        </div>
+        <div class="row">
+          <button type="button" class="btn quiet" id="copy-result">Copy result as text</button>
+          <button type="button" class="btn quiet" id="toggle-labels" aria-pressed="true">Labels on</button>
+        </div>
+      </div>
+      <div class="viewport" id="viewport">
+        <div class="labels" id="labels"></div>
+      </div>
+
+      <div class="explain" id="explain"></div>
+    </section>
+  </div>
+
+  <footer>
+    <span class="parity" id="parity">Checking this page against the Python tool&hellip;</span>
+    <span id="footer-sources">Sources: R1-1 District Schedule and Section 2 Definitions, Zoning and
+      Development By-law No. 3575, both the June 2026 consolidation (sources/ in the repository).</span>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+<script>
+"use strict";
+/* ==========================================================================
+   data.js is written by tool/export_web_data.py. It carries the Python
+   tool's own rule tables and wording (DATA.rules), the examples, and the
+   Python tool's answers to several hundred cases. This page holds no copy of
+   any number or reason sentence of its own; only the decision logic below is
+   repeated, line for line from impermeable_check.py, and it is checked
+   against those answers every time the page loads.
+   ========================================================================== */
+const DATA = window.TOOL_DATA || {};
+const R = DATA.rules || {};
+
+/* ---- Python-compatible number formatting -------------------------------- */
+// Python rounds ties to even ("{:.2f}" of 0.125 is "0.12"); toFixed rounds up.
+function pyFixed(x, d) {
+  if (Object.is(x, -0)) return "-" + (0).toFixed(d);          // Python keeps -0.00
+  const t = x * Math.pow(2, d + 1);
+  if (Number.isFinite(t) && Number.isInteger(t) && t % 2 !== 0) {
+    let n = Math.round(Math.abs(x) * Math.pow(10, d) - 0.5);   // the lower neighbour
+    if (n % 2 !== 0) n += 1;                                   // round half to even
+    return (x < 0 ? "-" : "") + (n / Math.pow(10, d)).toFixed(d);
+  }
+  return x.toFixed(d);
+}
+function pyF(x, d, comma) {               // "{:.2f}" or "{:,.2f}"
+  let s = pyFixed(x, d);
+  if (!comma) return s;
+  const neg = s[0] === "-";
+  if (neg) s = s.slice(1);
+  const [i, f] = s.split(".");
+  return (neg ? "-" : "") + i.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (f !== undefined ? "." + f : "");
+}
+function pyG(x) {                          // "{:g}"
+  if (typeof x !== "number" || !Number.isFinite(x)) return String(x);
+  if (x === 0) return "0";
+  const [mant, e] = x.toExponential(5).split("e");
+  const ei = parseInt(e, 10);
+  if (ei < -4 || ei >= 6) {
+    return mant.replace(/\.?0+$/, "") + "e" + (ei < 0 ? "-" : "+") + String(Math.abs(ei)).padStart(2, "0");
+  }
+  let f = x.toFixed(Math.max(0, 5 - ei));
+  if (f.indexOf(".") >= 0) f = f.replace(/\.?0+$/, "");
+  return f;
+}
+const has = (o, k) => o !== null && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
+// Python's str() of the JSON values the page can receive
+const pyStr = v => v === null || v === undefined ? "None" : v === true ? "True" : v === false ? "False" : String(v);
+const Q = s => "“" + s + "”";
+
+/* ==========================================================================
+   THE OPERATION: a line-for-line port of impermeable_check.py
+   ========================================================================== */
+
+/* ---- names ----------------------------------------------------------------- */
+function normalise(name) {
+  let text = (name === null || name === undefined) ? "" : pyStr(name);
+  text = text.split("_").join(" ").split("-").join(" ").split("/").join(" / ");
+  return text.toLowerCase().split(/\s+/).filter(w => w.length).join(" ");
+}
+let _known = null;
+function knownNames() {
+  if (_known) return _known;
+  const names = new Set();
+  for (const t of [R.BUILDINGS, R.NAMED_IMPERMEABLE, R.NAMED_PERMEABLE, R.LISTED_BASE_MATERIAL,
+                   R.WATER, R.NOT_NAMED_NOTES, R.ALIASES]) Object.keys(t || {}).forEach(k => names.add(k));
+  for (const t of [R.GROUND, R.WOOD]) (t || []).forEach(k => names.add(k));
+  _known = Array.from(names).map(n => n.trim()).sort();
+  return _known;
+}
+function canonical(name) {
+  const m = normalise(name);
+  return has(R.ALIASES, m) ? R.ALIASES[m] : m;
+}
+function editDistance(a, b) {
+  let prev = [];
+  for (let j = 0; j <= b.length; j++) prev.push(j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur.push(Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function suggest(name) {
+  const m = normalise(name);
+  if (!m) return null;
+  let best = null, bestD = null;
+  for (const cand of knownNames()) {
+    const d = editDistance(m, cand);
+    if (bestD === null || d < bestD || (d === bestD && cand < best)) { best = cand; bestD = d; }
+  }
+  const limit = Math.max(2, Math.floor(m.length / 3));
+  if (best !== null && bestD <= limit) return canonical(best);
+  return null;
+}
+
+/* ---- classification -------------------------------------------------------- */
+function stated(s, key) {
+  const v = has(s, key) ? s[key] : null;
+  if (v === null || v === undefined) return null;
+  return Boolean(v);
+}
+function classifyWood(s) {
+  const height = (has(s, "height_mm") ? s.height_mm : 0) || 0;
+  if (height > R.RAISED_DECK_MM) {
+    return ["impermeable", R.S2_IMPERMEABLE,
+      `Raised deck (${pyG(height)} mm, over ${R.RAISED_DECK_MM} mm) is not on grade, so the spaced-decking exception cannot apply (author's reading, see the note at the end).`,
+      "Raised deck – confirm treatment with the City."];
+  }
+  const spaced = stated(s, "spaced"), onGrade = stated(s, "on_grade"), layer = stated(s, "impermeable_layer");
+  const failed = [], unstated = [];
+  if (spaced === false) failed.push("boards not spaced"); else if (spaced === null) unstated.push("spacing not stated");
+  if (onGrade === false) failed.push("not installed on grade"); else if (onGrade === null) unstated.push("on-grade not stated");
+  if (layer === true) failed.push("impermeable layer underneath"); else if (layer === null) unstated.push("layer below not stated");
+  if (failed.length) return ["impermeable", R.S2_IMPERMEABLE, "Counts as “wood”: " + failed.join(", ") + ".", null];
+  if (unstated.length) return ["impermeable", R.S2_IMPERMEABLE,
+    "Counts as “wood” until confirmed: " + unstated.join(", ") + ".",
+    "Wood: state spaced, on_grade and impermeable_layer to test the spaced-decking exception."];
+  return ["permeable", R.S2_PERMEABLE,
+    "Spaced boards, on grade, nothing impermeable below: meets the spaced-decking exception (author's reading of the conditions).", null];
+}
+function cap(m) { return m.charAt(0).toUpperCase() + m.slice(1); }   // Python str.capitalize on these names
+function classify(s) {
+  const raw = has(s, "material") ? s.material : "";
+  const m = canonical(raw);
+  if (has(R.BUILDINGS, m)) {
+    const flag = m === "laneway house" ? R.LANEWAY_FLAG : null;
+    return ["building", m === "building" ? R.S426 : R.S2_IMPERMEABLE, R.BUILDINGS[m], flag];
+  }
+  if (R.WOOD.includes(m)) return classifyWood(s);
+  if (has(R.NAMED_IMPERMEABLE, m)) return ["impermeable", R.S2_IMPERMEABLE, R.NAMED_IMPERMEABLE[m], null];
+  if (has(R.LISTED_BASE_MATERIAL, m)) return ["impermeable", R.S2_IMPERMEABLE, R.LISTED_BASE_MATERIAL[m], null];
+  if (has(R.NAMED_PERMEABLE, m)) {
+    if (stated(s, "impermeable_layer") === true) {
+      return ["impermeable", R.S2_PERMEABLE, `${cap(m)} over an impermeable layer does not meet the Permeable Materials definition (author's reading).`, null];
+    }
+    if (stated(s, "on_grade") === false) {
+      return ["impermeable", R.S2_PERMEABLE, `${cap(m)} not installed on grade (a planter, a roof, a slab) does not meet the Permeable Materials definition (author's reading).`, null];
+    }
+    if (m === "river rock") {
+      const size = has(s, "size_cm") ? s.size_cm : null;
+      if (size === null || size === undefined) {
+        return ["impermeable", R.S2_PERMEABLE, "River rock is permeable only under 5 cm, and no size was given.", "Give the stone size (size_cm) to confirm."];
+      }
+      if (size >= 5) return ["impermeable", R.S2_PERMEABLE, `River rock of ${pyG(size)} cm is not under 5 cm.`, null];
+      return ["permeable", R.S2_PERMEABLE, `River rock of ${pyG(size)} cm is under 5 cm, so it is listed as permeable.`, null];
+    }
+    return ["permeable", R.S2_PERMEABLE, R.NAMED_PERMEABLE[m], null];
+  }
+  if (R.GROUND.includes(m)) return ["ground", R.NOT_LISTED, R.GROUND_NOTE, null];
+  if (has(R.WATER, m)) return ["impermeable", R.NOT_LISTED, R.WATER[m], null];
+  if (has(R.NOT_NAMED_NOTES, m)) {
+    const note = R.NOT_NAMED_NOTES[m];
+    return ["impermeable", R.S2_DIRECTOR, R.NOT_NAMED_DEFAULT + (note ? " " + note : ""), null];
+  }
+  const guess = suggest(m);
+  const shown = pyStr(raw);
+  const flag = guess ? `Unrecognised material “${shown}”. Did you mean “${guess}”?`
+                     : `Unrecognised material “${shown}”. Check the spelling, or add it to the material table.`;
+  return ["impermeable", R.NOT_LISTED, R.UNKNOWN_DEFAULT, flag];
+}
+
+/* ---- geometry: triangles clipped against triangles ------------------------- */
+function signedArea(pts) {
+  const n = pts.length;
+  let twice = 0.0;
+  for (let i = 0; i < n; i++) twice += pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1];
+  return twice / 2.0;
+}
+function polygonArea(pts) { return Math.abs(signedArea(pts)); }
+function addUp(values) { let t = 0.0; for (const v of values) t += v; return t; }
+function rectPoints(r) { const [x, y, w, d] = r; return [[x, y], [x + w, y], [x + w, y + d], [x, y + d]]; }
+function ccw(pts) { return signedArea(pts) >= 0 ? pts.slice() : pts.slice().reverse(); }
+function cross(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+function segmentsCross(p1, p2, p3, p4) {
+  const d1 = cross(p3, p4, p1), d2 = cross(p3, p4, p2), d3 = cross(p1, p2, p3), d4 = cross(p1, p2, p4);
+  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 !== 0 && d2 !== 0 && d3 !== 0 && d4 !== 0;
+}
+function isSimple(pts) {
+  const n = pts.length;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    if (Math.abs(i - j) === 1 || Math.abs(i - j) === n - 1) continue;
+    if (segmentsCross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return false;
+  }
+  return true;
+}
+function pointInTriangle(p, a, b, c) {
+  const d1 = cross(a, b, p), d2 = cross(b, c, p), d3 = cross(c, a, p);
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+}
+function triangulate(pts) {
+  const poly = ccw(pts);
+  let idx = []; for (let i = 0; i < poly.length; i++) idx.push(i);
+  const tris = [];
+  let guard = 0;
+  while (idx.length > 3 && guard < 10000) {
+    guard++;
+    let found = false;
+    for (let k = 0; k < idx.length; k++) {
+      const i0 = idx[(k - 1 + idx.length) % idx.length], i1 = idx[k], i2 = idx[(k + 1) % idx.length];
+      const a = poly[i0], b = poly[i1], c = poly[i2];
+      const turn = cross(a, b, c);
+      if (Math.abs(turn) <= 1e-9) { idx.splice(k, 1); found = true; break; }
+      if (turn < 0) continue;
+      let inside = false;
+      for (const j of idx) {
+        if (j === i0 || j === i1 || j === i2) continue;
+        if (pointInTriangle(poly[j], a, b, c)) { inside = true; break; }
+      }
+      if (inside) continue;
+      tris.push([a, b, c]);
+      idx.splice(k, 1);
+      found = true;
+      break;
+    }
+    if (!found) {
+      for (let k = 1; k < idx.length - 1; k++) tris.push([poly[idx[0]], poly[idx[k]], poly[idx[k + 1]]]);
+      idx = idx.slice(0, 3);
+      break;
+    }
+  }
+  if (idx.length === 3) {
+    const a = poly[idx[0]], b = poly[idx[1]], c = poly[idx[2]];
+    if (Math.abs(cross(a, b, c)) > 1e-9) tris.push([a, b, c]);
+  }
+  return tris.filter(t => polygonArea(t) > 1e-12);
+}
+function intersectAt(p, q, a, b) {
+  const dpq = [q[0] - p[0], q[1] - p[1]], dab = [b[0] - a[0], b[1] - a[1]];
+  const den = dpq[0] * dab[1] - dpq[1] * dab[0];
+  if (den === 0) return q.slice();
+  const t = ((a[0] - p[0]) * dab[1] - (a[1] - p[1]) * dab[0]) / den;
+  return [p[0] + t * dpq[0], p[1] + t * dpq[1]];
+}
+function convexClip(subject, clip) {
+  let out = subject.slice();
+  const n = clip.length;
+  for (let i = 0; i < n; i++) {
+    if (!out.length) break;
+    const a = clip[i], b = clip[(i + 1) % n];
+    const inp = out;
+    out = [];
+    for (let k = 0; k < inp.length; k++) {
+      const p = inp[(k - 1 + inp.length) % inp.length], q = inp[k];
+      const pIn = cross(a, b, p) >= 0, qIn = cross(a, b, q) >= 0;
+      if (qIn) { if (!pIn) out.push(intersectAt(p, q, a, b)); out.push(q); }
+      else if (pIn) out.push(intersectAt(p, q, a, b));
+    }
+  }
+  return (out.length >= 3 && polygonArea(out) > 1e-12) ? out : [];
+}
+function piecesArea(pieces) { let t = 0.0; for (const p of pieces) t += polygonArea(p); return t; }
+function intersectPieces(aPieces, bPieces) {
+  const out = [];
+  for (const p of aPieces) for (const q of bPieces) { const r = convexClip(p, q); if (r.length) out.push(r); }
+  return out;
+}
+function areaInsideUnion(pieces, others) {
+  let total = 0.0;
+  const rec = (current, start, sign) => {
+    for (let k = start; k < others.length; k++) {
+      const inter = intersectPieces(current, others[k]);
+      if (!inter.length) continue;
+      const a = piecesArea(inter);
+      if (a <= 1e-12) continue;
+      total += sign * a;
+      rec(inter, k + 1, -sign);
+    }
+  };
+  rec(pieces, 0, 1.0);
+  return Math.max(total, 0.0);
+}
+function outwardNormal(a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const L = Math.sqrt(dx * dx + dy * dy);
+  if (L === 0) return [0.0, 0.0];
+  return [dy / L, -dx / L];
+}
+function offsetPolygon(pts, d) {
+  const poly = ccw(pts), n = poly.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = poly[(i - 1 + n) % n], p1 = poly[i], p2 = poly[(i + 1) % n];
+    const n1 = outwardNormal(p0, p1), n2 = outwardNormal(p1, p2);
+    const sx = n1[0] + n2[0], sy = n1[1] + n2[1];
+    const L2 = sx * sx + sy * sy;
+    if (L2 < 0.25) out.push([p1[0] + n1[0] * d, p1[1] + n1[1] * d]);
+    else { const k = 2.0 * d / L2; out.push([p1[0] + sx * k, p1[1] + sy * k]); }
+  }
+  return out;
+}
+
+/* ---- input checking: the same sentences as the Python tool ------------------- */
+class InputError extends Error {}
+const isNum = v => typeof v === "number" && Number.isFinite(v);
+const isPoint = p => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]);
+const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
+function siteOutlines(site) {
+  if (has(site, "outlines") && Array.isArray(site.outlines) && site.outlines.length) return site.outlines;
+  if (has(site, "outline")) return [site.outline];
+  return null;
+}
+function validate(example) {
+  const problems = [];
+  if (!isObj(example)) return ["The design must be a JSON object with “site” and “surfaces”."];
+  let site = has(example, "site") ? example.site : null;
+  if (!isObj(site)) {
+    problems.push("“site” is missing. It needs an “outline”: the lot's corners in metres, e.g. [[0,0],[15.2,0],[15.2,39.6],[0,39.6]].");
+    site = {};
+  }
+  const outlines = siteOutlines(site);
+  if (outlines === null) {
+    problems.push("“site.outline” is missing or not a list of corner points. Give at least three [x, y] pairs in metres, or “outlines” as a list of such polygons for a site of several parcels.");
+  } else {
+    outlines.forEach((o, k) => {
+      const where = outlines.length === 1 ? "“site.outline”" : `“site.outlines[${k}]”`;
+      if (!Array.isArray(o) || o.length < 3 || !o.every(isPoint)) { problems.push(`${where} needs at least three [x, y] number pairs.`); return; }
+      if (!isSimple(o)) problems.push(`${where} crosses itself (a bow-tie). List the corners in order around the lot.`);
+      else if (polygonArea(o) <= 1e-9) problems.push(`${where} has no area. Its corners are in a line or repeat.`);
+    });
+  }
+  const units = pyStr(has(site, "units") ? site.units : (has(example, "units") ? example.units : "m")).trim().toLowerCase();
+  if (!["m", "ft", "metres", "meters", "feet"].includes(units)) problems.push(`“units” must be “m” or “ft”, not “${units}”.`);
+  const fr = has(site, "frontage_m") ? site.frontage_m : null;
+  if (fr !== null && fr !== undefined && !isNum(fr)) problems.push("“site.frontage_m” must be a number, not text in quotes.");
+  const ps = has(site, "parking_spaces") ? site.parking_spaces : (has(example, "parking_spaces") ? example.parking_spaces : null);
+  if (ps !== null && ps !== undefined && (!isNum(ps) || ps < 0 || Math.trunc(ps) !== ps)) problems.push("“parking_spaces” must be a whole number of spaces.");
+
+  let surfaces = has(example, "surfaces") ? example.surfaces : null;
+  if (!Array.isArray(surfaces)) { problems.push("“surfaces” is missing or not a list. Use [] for an empty lot."); surfaces = []; }
+  const seen = new Set();
+  surfaces.forEach((s, i) => {
+    let tag = `surface ${i + 1}`;
+    if (!isObj(s)) { problems.push(`${tag} is not an object.`); return; }
+    const label = has(s, "label") ? s.label : (has(s, "id") ? s.id : tag);
+    tag = `“${pyStr(label)}”`;
+    const sid = has(s, "id") ? s.id : (has(s, "label") ? s.label : `surface-${i + 1}`);
+    if (seen.has(sid)) problems.push(`${tag}: the id “${pyStr(sid)}” is used twice. Ids must be unique.`);
+    seen.add(sid);
+    const mat = has(s, "material") ? s.material : null;
+    if (typeof mat !== "string" || !mat.trim().length) {
+      problems.push(`${tag} has no “material”. Give the material as a word, e.g. “concrete”, “permeable pavers”, “building”.`);
+    }
+    const kinds = ["rect", "polygon", "area_m2"].filter(k => has(s, k));
+    if (kinds.length === 0) {
+      problems.push(`${tag} has no geometry. Give “rect”: [x, y, width, depth], or “polygon”: [[x, y], ...], or “area_m2” from an area schedule (counted, but not drawn or checked for overlap).`);
+    } else if (kinds.length > 1) {
+      problems.push(`${tag} gives ${kinds.join(" and ")}. Give only one.`);
+    } else if (kinds[0] === "rect") {
+      const r = s.rect;
+      if (!(Array.isArray(r) && r.length === 4 && r.every(isNum))) problems.push(`${tag}: “rect” must be four numbers [x, y, width, depth] in metres.`);
+      else if (r[2] <= 0 || r[3] <= 0) problems.push(`${tag}: width and depth must be positive numbers (got ${pyG(r[2])} and ${pyG(r[3])}).`);
+    } else if (kinds[0] === "polygon") {
+      const p = s.polygon;
+      if (!(Array.isArray(p) && p.length >= 3 && p.every(isPoint))) problems.push(`${tag}: “polygon” needs at least three [x, y] number pairs.`);
+      else if (!isSimple(p)) problems.push(`${tag}: the polygon crosses itself. List the corners in order around the shape.`);
+      else if (polygonArea(p) <= 1e-9) problems.push(`${tag}: the polygon has no area.`);
+    } else {
+      const a = s.area_m2;
+      if (!isNum(a) || a <= 0) problems.push(`${tag}: “area_m2” must be a positive number.`);
+    }
+    for (const key of ["spaced", "on_grade", "impermeable_layer", "parking"]) {
+      if (has(s, key) && s[key] !== null && typeof s[key] !== "boolean") {
+        problems.push(`${tag}: “${key}” must be true or false (no quotes), not ${JSON.stringify(s[key])}.`);
+      }
+    }
+    if (has(s, "height_mm") && s.height_mm !== null) {
+      if (!isNum(s.height_mm) || s.height_mm < 0) problems.push(`${tag}: “height_mm” must be a number of millimetres, zero or more.`);
+    }
+    if (has(s, "size_cm") && s.size_cm !== null) {
+      if (!isNum(s.size_cm) || s.size_cm <= 0) problems.push(`${tag}: “size_cm” must be a positive number of centimetres.`);
+    }
+  });
+  return problems;
+}
+
+/* ---- the operation ----------------------------------------------------------- */
+function check(example) {
+  const problems = validate(example);
+  if (problems.length) throw new InputError(problems.join("\n"));
+
+  const site = example.site;
+  const warnings = [], notes = [];
+  const units = pyStr(has(site, "units") ? site.units : (has(example, "units") ? example.units : "m")).trim().toLowerCase();
+  const f = (units === "ft" || units === "feet") ? R.FT_TO_M : 1.0;
+  if (f !== 1.0) notes.push(`Dimensions were given in feet and converted at ${R.FT_TO_M} m per foot.`);
+
+  const outlines = siteOutlines(site).map(o => o.map(p => [p[0] * f, p[1] * f]));
+  const siteArea = addUp(outlines.map(o => polygonArea(o)));
+  if (outlines.length > 1) notes.push(`The site is ${outlines.length} adjoining parcels treated as one zoning site. ${R.S2_SITE}`);
+  let sitePieces = [], bandPieces = [];
+  for (const o of outlines) { sitePieces = sitePieces.concat(triangulate(o)); bandPieces = bandPieces.concat(triangulate(offsetPolygon(o, R.EDGE_TOLERANCE_M))); }
+
+  let applies = true, whyNot = null;
+  const zone = pyStr(has(site, "zone") ? site.zone : "R1-1").trim().toUpperCase();
+  let use = normalise(has(example, "use") ? example.use : "single detached house") || "single detached house";
+  if (zone !== "R1-1") { applies = false; whyNot = `Zone is ${zone}, not R1-1.`; }
+  else if (R.S31_WORDS.some(w => use.includes(w))) {
+    applies = false;
+    whyNot = "A multiplex (multiple dwelling of 3 to 8 units) is regulated by s.3.1, which sets no numeric impermeability or site-coverage limit. s.3.2.2.8 does not apply to it. Other instruments, or conditions of approval, may still address permeability.";
+  } else if (use === "laneway house") {
+    notes.push("A laneway house is accessory to a single detached house on the same site, so the SITE is assessed under s.3.2 as a single detached house. The laneway footprint is counted as a building and flagged.");
+    use = "single detached house";
+  } else if (!R.DWELLING_USES.includes(use)) {
+    if (use.includes("dwelling") || use.includes("house") || use.includes("duplex")) {
+      warnings.push(`Use “${use}” is not one this tool recognises. It is assessed under s.3.2, which governs “all other uses not regulated by section 3.1”.`);
+    } else {
+      notes.push(`Use “${use}” is a non-dwelling use. It is assessed under s.3.2 (“all other uses”), and the Director of Planning may increase the impermeable maximum for it. ${R.S32214}`);
+    }
+  }
+
+  let frontage = has(site, "frontage_m") ? site.frontage_m : null;
+  if (frontage !== null && frontage !== undefined) frontage = frontage * f; else frontage = null;
+  if (siteArea < R.MIN_SITE_AREA_M2) {
+    warnings.push(`Site is ${pyF(siteArea, 2, true)} m², under the s.3.2.2.1 minimum of ${pyG(R.MIN_SITE_AREA_M2)} m². Assessed anyway: under s.3.2.2.9 the Director of Planning may reduce the minimum site area.`);
+  }
+  if (frontage !== null && frontage < R.MIN_FRONTAGE_M) {
+    warnings.push(`Frontage ${pyG(frontage)} m is under the s.3.2.2.2 minimum of ${pyG(R.MIN_FRONTAGE_M)} m. Assessed anyway: under s.3.2.2.9 the Director of Planning may reduce it, and s.3.2.2.12 provides for a single detached house on a narrower lot on record as of June 24, 2014, if the use was previously approved.`);
+  }
+  if (f === 1.0 && (siteArea > R.FEET_SUSPECT_AREA_M2 || (frontage !== null && frontage > R.FEET_SUSPECT_FRONTAGE_M))) {
+    warnings.push(`Site is ${pyF(siteArea, 0, true)} m²` + (frontage !== null ? ` and ${pyG(frontage)} m wide` : "")
+      + ". That is very large for an R1-1 lot. Are these dimensions in feet? If so add \"units\": \"ft\" to the site.");
+  }
+
+  const rows = [];
+  let reliedOnReading = false;
+  example.surfaces.forEach((s, i) => {
+    const sid = has(s, "id") ? s.id : (has(s, "label") ? s.label : `surface-${i + 1}`);
+    const label = has(s, "label") ? s.label : pyStr(sid);
+    let [cls, source, reason, flag] = classify(s);
+    if (reason.includes("author's reading")) reliedOnReading = true;
+    let pts = null;
+    if (has(s, "rect")) pts = rectPoints(s.rect.map(v => v * f));
+    else if (has(s, "polygon")) pts = ccw(s.polygon.map(p => [p[0] * f, p[1] * f]));
+    let gross, insidePieces, inside, outside;
+    if (pts !== null) {
+      gross = polygonArea(pts);
+      const own = triangulate(pts);
+      const inBand = piecesArea(intersectPieces(own, bandPieces));
+      if (gross - inBand <= R.OVERLAP_TOLERANCE_M2) { insidePieces = own; inside = gross; outside = 0.0; }
+      else {
+        insidePieces = intersectPieces(own, sitePieces);
+        inside = piecesArea(insidePieces);
+        outside = gross - inside;
+        warnings.push(`${pyF(outside, 2, true)} m² of “${label}” lies outside the lot and is not counted (s.3.2.2.8 is a share of the site area).`);
+      }
+    } else {
+      gross = s.area_m2 * f * f;
+      insidePieces = null; inside = gross; outside = 0.0;
+      flag = (flag ? flag + " " : "") + "Area given without geometry: counted as given, not drawn, not checked against the lot or other surfaces.";
+    }
+    rows.push({ id: sid, label, material: has(s, "material") ? s.material : "", canonical: canonical(has(s, "material") ? s.material : ""),
+                class: cls, source, reason, flag, points: pts, pieces: insidePieces,
+                gross_m2: gross, outside_m2: outside, overlap_m2: 0.0, area_m2: inside,
+                parking: Boolean(has(s, "parking") ? s.parking : false), order: i });
+  });
+
+  const order = rows.slice().sort((a, b) => (R.CLASS_PRIORITY[a.class] - R.CLASS_PRIORITY[b.class]) || (a.order - b.order));
+  const placed = [];
+  for (const r of order) {
+    if (r.pieces === null) continue;
+    const others = placed.map(p => p.pieces);
+    const covered = others.length ? areaInsideUnion(r.pieces, others) : 0.0;
+    if (covered > R.OVERLAP_TOLERANCE_M2) {
+      r.overlap_m2 = covered;
+      const under = [];
+      for (const p of placed) {
+        const ov = piecesArea(intersectPieces(r.pieces, p.pieces));
+        if (ov > R.OVERLAP_TOLERANCE_M2) under.push(`“${p.label}” (${pyF(ov, 2, true)} m²)`);
+      }
+      notes.push(`“${r.label}” overlaps ${under.join(", ")}. That area is counted once, with the surface counted first (the stricter class), not twice.`);
+    }
+    r.area_m2 = Math.max(r.gross_m2 - r.outside_m2 - r.overlap_m2, 0.0);
+    placed.push(r);
+  }
+
+  const total = (...classes) => { let t = 0.0; for (const r of rows) if (classes.includes(r.class)) t += r.area_m2; return t; };
+  const building = total("building");
+  const impermeable = total("building", "impermeable");
+  const permeable = total("permeable");
+  const ground = total("ground");
+  const assigned = addUp(rows.map(r => r.area_m2));
+  const unassigned = siteArea - assigned;
+  if (unassigned < -R.OVERLAP_TOLERANCE_M2) {
+    warnings.push(`Surfaces add up to ${pyF(assigned, 2, true)} m², more than the ${pyF(siteArea, 2, true)} m² site. Some area given without geometry is probably counted twice.`);
+  }
+  if (unassigned > 0.5 * siteArea && rows.length) {
+    notes.push(`${pyF(unassigned, 2, true)} m² of the lot (${pyF(100 * unassigned / siteArea, 0, false)}%) has no surface drawn on it and is taken to be lawn or planting. A driveway or walk left off the plan would pass unnoticed here.`);
+  }
+
+  const impLimit = R.IMPERMEABLE_LIMIT * siteArea, bldLimit = R.BUILDING_LIMIT * siteArea, eps = 1e-9;
+  let margin = impLimit - impermeable;
+  if (Math.abs(margin) <= eps) margin = 0.0;
+  const nearLimit = (Math.abs(margin) < R.NEAR_LIMIT_M2
+                     || Math.abs(bldLimit - building) < R.NEAR_LIMIT_M2
+                     || Math.abs(100 * impermeable / siteArea - 100 * R.IMPERMEABLE_LIMIT) < R.NEAR_LIMIT_PCT
+                     || Math.abs(100 * building / siteArea - 100 * R.BUILDING_LIMIT) < R.NEAR_LIMIT_PCT);
+  let pavers = 0.0;
+  for (const r of rows) if (r.canonical === "permeable pavers") pavers += r.area_m2;
+
+  const spaces = has(site, "parking_spaces") ? site.parking_spaces : (has(example, "parking_spaces") ? example.parking_spaces : null);
+  const parkingRows = rows.filter(r => r.parking);
+  let parkingM2 = 0.0; for (const r of parkingRows) parkingM2 += r.area_m2;
+  const parkingApplies = spaces !== null && spaces !== undefined && spaces > R.PARKING_AREA_SPACES;
+  let parkingPass = null;
+  if (parkingApplies) {
+    parkingPass = parkingM2 <= R.PARKING_LIMIT * siteArea + eps;
+    notes.push(`${pyG(spaces)} parking spaces: more than ${R.PARKING_AREA_SPACES}, so the parking surfaces are a Parking Area and s.3.2.2.13 applies. ${R.S32213}`);
+  } else if (parkingRows.length) {
+    const count = (spaces !== null && spaces !== undefined) ? `${pyG(spaces)} parking space${spaces === 1 ? "" : "s"}` : "an unstated number of parking spaces";
+    notes.push(`Parking surfaces serve ${count}. ${R.PARKING_AREA_SPACES} or fewer spaces accessory to a residential use are not a Parking Area (Section 2, p.30), so the 30% limit in s.3.2.2.13 does not apply.`);
+  }
+  if (reliedOnReading) notes.push(R.READING_CONDITIONS);
+
+  return {
+    version: R.VERSION, name: has(example, "name") ? example.name : "", address: has(site, "address") ? site.address : "",
+    use, applies, why_not: whyNot, site_area_m2: siteArea, rows,
+    building_m2: building, building_pct: building / siteArea, building_limit_m2: bldLimit,
+    building_pass: building <= bldLimit + eps,
+    impermeable_m2: impermeable, impermeable_pct: impermeable / siteArea, impermeable_limit_m2: impLimit,
+    impermeable_pass: impermeable <= impLimit + eps, margin_m2: margin, near_limit: nearLimit,
+    permeable_m2: permeable, ground_m2: ground, unassigned_m2: Math.max(unassigned, 0.0),
+    pavers_m2: pavers, if_pavers_were_permeable_pct: (impermeable - pavers) / siteArea,
+    parking_m2: parkingM2, parking_applies: parkingApplies, parking_pass: parkingPass,
+    parking_limit_m2: R.PARKING_LIMIT * siteArea, warnings, notes,
+  };
+}
+
+/* ---- parity: this page against the Python tool's own answers --------------- */
+function sameValue(a, b) {
+  if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => sameValue(v, b[i]));
+  if (a && b && typeof a === "object" && typeof b === "object") return Object.keys(b).every(k => sameValue(a[k], b[k]));
+  return a === b;
+}
+function displayOf(r) {
+  const m = r.margin_m2;
+  const pd = r.near_limit ? 4 : 2, ad = r.near_limit ? 3 : 2;
+  return {
+    site: pyF(r.site_area_m2, 2, true), impermeable: pyF(r.impermeable_m2, ad, true),
+    limit: pyF(r.impermeable_limit_m2, ad, true),
+    margin: r.impermeable_pass ? pyF(m, ad, true) : pyF(-m, ad, true),
+    building: pyF(r.building_m2, ad, true),
+    impermeable_pct: pyF(100 * r.impermeable_pct, pd), building_pct: pyF(100 * r.building_pct, pd),
+    unassigned: pyF(r.unassigned_m2, 2),
+    rows: r.rows.map(x => pyF(x.area_m2, 2)),
+    shares: r.rows.map(x => pyF(100 * x.area_m2 / r.site_area_m2, 1)),
+  };
+}
+function runParity() {
+  const bad = [];
+  let nc = 0, nl = 0, nf = 0, nv = 0;
+  for (const c of DATA.classify_cases || []) {
+    nc++;
+    const got = classify(c.input);
+    if (!sameValue(got, c.expect)) bad.push({ kind: "classification", input: c.input, got, expect: c.expect });
+  }
+  for (const c of DATA.suggest_cases || []) {
+    nc++;
+    const got = suggest(c.input);
+    if (got !== c.expect) bad.push({ kind: "suggestion", input: c.input, got, expect: c.expect });
+  }
+  for (const c of DATA.check_cases || []) {
+    nl++;
+    let got;
+    try { got = check(c.input); got.display = displayOf(got); } catch (e) { got = { error: String(e) }; }
+    if (!sameValue(got, c.expect)) bad.push({ kind: "lot", input: c.input.name, got, expect: c.expect });
+  }
+  for (const c of DATA.invalid_cases || []) {
+    nv++;
+    const got = validate(c.input);
+    if (!sameValue(got, c.expect)) bad.push({ kind: "refusal", input: c.input.name, got, expect: c.expect });
+  }
+  const F = DATA.format_cases || { fixed: [], g: [] };
+  for (const [x, d, comma, expect] of F.fixed) {
+    nf++;
+    const got = pyF(x, d, comma);
+    if (got !== expect) bad.push({ kind: "format", input: [x, d, comma], got, expect });
+  }
+  for (const [x, expect] of F.g) {
+    nf++;
+    const got = pyG(x);
+    if (got !== expect) bad.push({ kind: "format g", input: x, got, expect });
+  }
+  return { nc, nl, nf, nv, bad };
+}
+
+/* ==========================================================================
+   THE PAGE
+   ========================================================================== */
+const COLOURS = { building: 0x263456, impermeable: 0x4e5054, permeable: 0x68843e, ground: 0xe2e6da, outside: 0xc62828 };
+const CSS_COL = { building: "var(--building)", impermeable: "var(--graphite)", permeable: "var(--moss)", ground: "var(--ground)" };
+const CLASS_WORD = { building: "Counts · building", impermeable: "Counts · impermeable", permeable: "Permeable", ground: "Not counted" };
+const m2 = x => pyF(x, 2, true) + " m²";
+const pct = x => pyF(100 * x, 2) + "%";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const WOODISH = m => (R.WOOD || []).includes(canonical(m));
+const LAYERED = m => has(R.NAMED_PERMEABLE, canonical(m));
+
+/* ---- state ----------------------------------------------------------------- */
+const EXAMPLE_KEYS = Object.keys(DATA.examples || {});
+const EXAMPLE_LABEL = { "as-designed": "As designed", "revised": "Revised", "laneway": "33 ft lot + laneway" };
+const state = { exampleKey: EXAMPLE_KEYS[0] || null, design: null, selected: null, view: "plan",
+                labels: true, edited: false, whatif: false, result: null, problems: null };
+function loadExample(key) {
+  state.exampleKey = key;
+  state.design = JSON.parse(JSON.stringify(DATA.examples[key]));
+  state.selected = null; state.edited = false; state.whatif = false;
+}
+function markEdited() { state.edited = true; }
+const $ = id => document.getElementById(id);
+function outlinesOf(site) { return siteOutlines(site) || [[[0, 0], [1, 0], [1, 1]]]; }
+function bbox(site) {
+  const pts = outlinesOf(site).flat();
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { minx: Math.min(...xs), maxx: Math.max(...xs), miny: Math.min(...ys), maxy: Math.max(...ys) };
+}
+
+/* ---- the lot ------------------------------------------------------------------ */
+function renderLot() {
+  const site = state.design.site;
+  const b = bbox(site);
+  const outlines = outlinesOf(site);
+  const corners = outlines.reduce((n, o) => n + o.length, 0);
+  const isRect = outlines.length === 1 && outlines[0].length === 4 && Math.abs(polygonArea(outlines[0]) - (b.maxx - b.minx) * (b.maxy - b.miny)) < 1e-6;
+  const unitsNote = (site.units === "ft" || site.units === "feet") ? " Dimensions in feet." : "";
+  $("lot-note").textContent = (isRect ? `A ${pyF(b.maxx - b.minx, 2)} × ${pyF(b.maxy - b.miny, 2)} m rectangle.`
+    : `${outlines.length > 1 ? outlines.length + " parcels, " : ""}${corners} corners${site.site_id ? " from City parcel " + site.site_id : ""}, ${pyF(b.maxx - b.minx, 2)} × ${pyF(b.maxy - b.miny, 2)} m overall.`) + unitsNote;
+  if (document.activeElement !== $("lot-address")) $("lot-address").value = site.address || "";
+  if (document.activeElement !== $("lot-width")) $("lot-width").value = pyF(b.maxx - b.minx, 2);
+  if (document.activeElement !== $("lot-depth")) $("lot-depth").value = pyF(b.maxy - b.miny, 2);
+}
+$("lot-apply").addEventListener("click", () => {
+  const w = parseFloat($("lot-width").value), d = parseFloat($("lot-depth").value);
+  if (!(w > 0 && d > 0)) { $("lot-note").textContent = "Width and depth must be positive numbers of metres."; return; }
+  const site = state.design.site;
+  delete site.outlines; delete site.site_id; delete site.units;
+  site.outline = [[0, 0], [w, 0], [w, d], [0, d]];
+  site.frontage_m = w;
+  site.address = $("lot-address").value;
+  markEdited();
+  update();
+});
+$("lot-address").addEventListener("change", () => { state.design.site.address = $("lot-address").value; markEdited(); update({ keepCamera: true, keepSchedule: true }); });
+
+/* ---- the schedule (inputs) -------------------------------------------------- */
+function materialOptions(current) {
+  const cur = normalise({ material: current }.material);
+  let found = false;
+  const groups = (DATA.material_groups || []).map(([g, ms]) =>
+    `<optgroup label="${esc(g)}">` + ms.map(m => { if (m === cur) found = true;
+      return `<option value="${esc(m)}"${m === cur ? " selected" : ""}>${esc(m)}</option>`; }).join("") + `</optgroup>`).join("");
+  const extra = found ? "" : `<option value="${esc(current)}" selected>${esc(current)} (as typed)</option>`;
+  return extra + groups;
+}
+function renderExampleSeg() {
+  $("example-seg").innerHTML = EXAMPLE_KEYS.map(k =>
+    `<button type="button" data-ex="${k}" aria-pressed="${!state.edited && state.exampleKey === k}">${esc(EXAMPLE_LABEL[k] || k)}</button>`
+  ).join("");
+  const d = state.design;
+  $("example-note").textContent = state.edited
+    ? "Edited. Pick an example to start again."
+    : `${d.site.address || "Lot"}: ${d.name || ""}. ${d.site.site_id ? "The lot is real; the design is an example." : "The lot and the design are illustrative."}`;
+}
+const TRI = (name, i, k, v) => `<label class="num">${name}
+  <select data-i="${i}" data-k="${k}" aria-label="${name}">
+    <option value=""${v === null || v === undefined ? " selected" : ""}>not stated</option>
+    <option value="true"${v === true ? " selected" : ""}>yes</option>
+    <option value="false"${v === false ? " selected" : ""}>no</option></select></label>`;
+function renderSchedule(result) {
+  const byId = {};
+  (result ? result.rows : []).forEach(r => { byId[r.id] = r; });
+  const html = state.design.surfaces.map((s, i) => {
+    const r = byId[s.id] || {};
+    const m = s.material;
+    let dimsHtml;
+    if (has(s, "rect")) {
+      const rect = s.rect;
+      dimsHtml = `<div class="dims">${["x", "y", "width", "depth"].map((k, j) =>
+        `<label>${k}<input type="number" step="0.05" ${j >= 2 ? 'min="0.05"' : ""} inputmode="decimal"
+          id="s-${esc(s.id)}-${k}" data-i="${i}" data-k="rect${j}" value="${rect[j]}"></label>`).join("")}</div>`;
+    } else if (has(s, "polygon")) {
+      dimsHtml = `<p class="hint">Polygon surface (${s.polygon.length} corners). Edit its corners in the JSON.</p>`;
+    } else {
+      dimsHtml = `<div class="dims"><label>area m²<input type="number" step="0.1" min="0.1" inputmode="decimal"
+          data-i="${i}" data-k="area_m2" value="${s.area_m2}"></label></div>
+        <p class="hint">From an area schedule: counted, not drawn, not checked against the lot or other surfaces.</p>`;
+    }
+    let cond = "";
+    if (WOODISH(m)) {
+      cond = `<div class="cond" role="group" aria-label="Wood conditions">
+        ${TRI("boards spaced?", i, "spaced", s.spaced)}
+        ${TRI("on grade?", i, "on_grade", s.on_grade)}
+        ${TRI("slab, membrane or plastic below?", i, "impermeable_layer", s.impermeable_layer)}
+        <label class="num">height <input type="number" min="0" step="50" data-i="${i}" data-k="height_mm" value="${s.height_mm || 0}"> mm</label>
+      </div>`;
+    } else if (LAYERED(m)) {
+      cond = `<div class="cond" role="group" aria-label="Installation">
+        ${TRI("laid over plastic sheeting or a membrane?", i, "impermeable_layer", s.impermeable_layer)}
+        ${canonical(m) === "river rock" ? `<label class="num">stone size <input type="number" min="0" step="0.5" data-i="${i}" data-k="size_cm" value="${s.size_cm ?? ""}"> cm</label>` : ""}
+      </div>`;
+    }
+    const flagged = r.flag ? ` <span class="chip flagged" title="${esc(r.flag)}">check</span>` : "";
+    const extra = (r.outside_m2 > R.OVERLAP_TOLERANCE_M2 || r.overlap_m2 > R.OVERLAP_TOLERANCE_M2)
+      ? `<p class="hint">drawn ${pyF(r.gross_m2, 2)} m²${r.outside_m2 > R.OVERLAP_TOLERANCE_M2 ? `, ${pyF(r.outside_m2, 2)} outside the lot` : ""}${r.overlap_m2 > R.OVERLAP_TOLERANCE_M2 ? `, ${pyF(r.overlap_m2, 2)} under another surface` : ""} → counted ${pyF(r.area_m2, 2)}</p>` : "";
+    return `<div class="surface" data-id="${esc(s.id)}" aria-current="${state.selected === s.id}">
+      <i class="swatch" style="background:${CSS_COL[r.class] || "#999"}"></i>
+      <input class="name" aria-label="Surface name" data-i="${i}" data-k="label" value="${esc(s.label)}">
+      <span class="row" style="gap:6px;flex-wrap:nowrap">
+        <span class="area">${r.area_m2 !== undefined ? pyF(r.area_m2, 2) + " m²" : ""}</span>
+        <button class="del" type="button" data-del="${i}" aria-label="Remove ${esc(s.label)}">&times;</button>
+      </span>
+      <div class="fields">
+        <div class="row" style="flex-wrap:nowrap">
+          <select aria-label="Material" data-i="${i}" data-k="material">${materialOptions(s.material)}</select>
+          <span class="chip ${r.class || ""}">${esc(CLASS_WORD[r.class] || "")}</span>${flagged}
+        </div>
+        ${dimsHtml}
+        ${extra}
+        ${cond}
+      </div>
+    </div>`;
+  }).join("");
+  const un = result ? result.unassigned_m2 : 0;
+  const rest = `<div class="rest" ${un > 0.005 ? "" : "hidden"}><i class="swatch" style="background:var(--ground)"></i>
+      <span>Rest of the lot: nothing drawn (taken as lawn, planting)</span><span class="area">${pyF(un, 2)} m²</span></div>`;
+  $("schedule").innerHTML = html + rest;
+  $("site-area").textContent = result ? "site " + m2(result.site_area_m2) : "";
+}
+
+/* ---- the verdict ------------------------------------------------------------ */
+function dimBar(parts, share, total, limitShare) {
+  const W = 1000, y = 20, h = 12;
+  let x = 0;
+  const segs = parts.map(p => {
+    const w = Math.max(0, p.area / total * W);
+    const s = `<rect x="${x.toFixed(2)}" y="${y - h / 2}" width="${w.toFixed(2)}" height="${h}" fill="${p.fill}" stroke="#f5f6f2" stroke-width="1"${p.dashed ? ' stroke-dasharray="4 3" fill-opacity="0.35"' : ""}><title>${esc(p.label)}: ${m2(p.area)}</title></rect>`;
+    x += w; return s;
+  }).join("");
+  const lx = limitShare * W;
+  return `<svg class="dimbar" viewBox="0 0 ${W} 40" preserveAspectRatio="none" role="img"
+      aria-label="${esc(pct(share))} of the site, against a limit of ${esc(pct(limitShare))}">
+    <line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#1e2a44" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <line x1="0" y1="${y - 9}" x2="0" y2="${y + 9}" stroke="#1e2a44" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    <line x1="${W}" y1="${y - 9}" x2="${W}" y2="${y + 9}" stroke="#1e2a44" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    ${segs}
+    <line x1="${lx}" y1="${y - 14}" x2="${lx}" y2="${y + 14}" stroke="#cc5500" stroke-width="3" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+function renderProblems(problems) {
+  $("verdict").innerHTML = `<div class="big"><span class="pill na">Cannot check</span></div>
+    <div><p style="margin:0 0 6px;font-size:15px">This design cannot be checked as written:</p>
+    <ul class="warnings">${problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`;
+}
+function renderVerdict(r) {
+  const v = $("verdict");
+  const lists = `${r.warnings.length ? `<ul class="warnings">${r.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+    ${r.notes.length ? `<ul class="notes">${r.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}`;
+  if (!r.applies) {
+    v.innerHTML = `<div class="big"><span class="pill na">Not assessed</span></div>
+      <div><p style="margin:0;font-size:15px">${esc(r.why_not)}</p></div>${lists}`;
+    return;
+  }
+  const d = displayOf(r);
+  const counted = r.rows.filter(x => (x.class === "building" || x.class === "impermeable") && x.area_m2 > 0)
+    .sort((a, b) => (a.class !== "building") - (b.class !== "building"));
+  const isPaver = x => x.canonical === "permeable pavers";
+  const parts = counted.map(x => ({ area: x.area_m2, label: x.label,
+    fill: x.class === "building" ? "#263456" : (state.whatif && isPaver(x) ? "#68843e" : "#4e5054"), dashed: state.whatif && isPaver(x) }));
+  const bparts = counted.filter(x => x.class === "building").map(x => ({ area: x.area_m2, label: x.label, fill: "#263456" }));
+  const ok = r.impermeable_pass, bok = r.building_pass, m = r.margin_m2;
+  const tag = (pass, word) => `<span class="pill ${pass ? "pass" : "fail"}">${word || (pass ? "Pass" : "Fail")}</span>`;
+  const whatifPct = r.if_pavers_were_permeable_pct;
+  const whatifPass = (r.impermeable_m2 - r.pavers_m2) <= r.impermeable_limit_m2 + 1e-9;
+  v.innerHTML = `
+    <div class="big">
+      ${state.whatif
+        ? `<span class="pct whatif">${pct(whatifPct)}</span>
+           <span class="row" style="gap:6px"><span class="pill na">Not the by-law</span><span class="margin mono">if pavers were permeable</span></span>
+           <span class="margin">This is what the name suggests, and what a designer expects. The by-law result is <b>${d.impermeable_pct}% · ${ok ? "PASS" : "FAIL"}</b>.</span>`
+        : `<span class="pct">${d.impermeable_pct}%</span>
+           <span class="row" style="gap:6px">${tag(ok)}<span class="margin mono">s.3.2.2.8</span></span>
+           <span class="margin">${ok ? `${d.margin} m² of impermeable surface to spare`
+             : `Over by ${d.margin} m². Reduce the impermeable total by at least that much: remove it, plant it, or change it to a listed permeable material.`}</span>
+           ${r.near_limit ? `<span class="margin">Closer to the limit than two decimals show; the verdict uses unrounded areas.</span>` : ""}`}
+      ${bok ? "" : `<span class="row" style="gap:6px;margin-top:4px">${tag(false)}<span class="margin mono">s.3.2.2.7</span></span>
+        <span class="margin">Buildings cover ${d.building_pct}% of the site, over the ${pct(R.BUILDING_LIMIT)} limit.</span>`}
+      ${r.parking_applies ? `<span class="row" style="gap:6px;margin-top:4px">${tag(r.parking_pass)}<span class="margin mono">s.3.2.2.13</span></span>
+        <span class="margin">Parking area ${m2(r.parking_m2)} = ${pct(r.parking_m2 / r.site_area_m2)} of the site, limit ${pct(R.PARKING_LIMIT)}.</span>` : ""}
+    </div>
+    <div class="bars">
+      <div>
+        <div class="bar-label"><span><b>Impermeable, buildings included</b> &middot; s.3.2.2.8 &amp; s.4.2.2</span>
+          <span class="num">${d.impermeable} of ${d.limit} m² allowed &middot; ${ok ? "pass" : "fail"}</span></div>
+        ${dimBar(parts, r.impermeable_pct, r.site_area_m2, R.IMPERMEABLE_LIMIT)}
+      </div>
+      <div>
+        <div class="bar-label"><span><b>Buildings</b> &middot; s.3.2.2.7</span>
+          <span class="num">${d.building} m² = ${d.building_pct}% of ${pct(R.BUILDING_LIMIT)} allowed &middot; ${bok ? "pass" : "<b style='color:var(--fail)'>fail</b>"}</span></div>
+        ${dimBar(bparts, r.building_pct, r.site_area_m2, R.BUILDING_LIMIT)}
+      </div>
+    </div>
+    ${r.pavers_m2 > 0 ? `<div class="surprise"><label><input type="checkbox" id="whatif" ${state.whatif ? "checked" : ""}>
+       <b>What if permeable pavers were permeable?</b> ${m2(r.pavers_m2)} of this design is permeable pavers.
+       Counted as the name suggests, the total would be ${pct(whatifPct)} (${whatifPass ? "a pass" : "still a fail"}).
+       They are not: Section 2 names ${Q("permeable pavers")} as an impermeable material, so the by-law total is ${d.impermeable_pct}%.</label></div>` : ""}
+    ${lists}`;
+  const cb = $("whatif");
+  if (cb) cb.addEventListener("change", () => { state.whatif = cb.checked; update({ keepCamera: true, keepSchedule: true }); });
+}
+
+/* ---- explain ----------------------------------------------------------------- */
+function splitSource(source) {
+  const i = source.indexOf("“");
+  if (i < 0) return { quote: null, cite: source };
+  return { quote: source.slice(i), cite: source.slice(0, i).replace(/[:\s]+$/, "") + " — Zoning and Development By-law No. 3575, June 2026" };
+}
+function renderExplain(r) {
+  const e = $("explain");
+  const row = r ? r.rows.find(x => x.id === state.selected) : null;
+  if (!row) {
+    e.innerHTML = `
+      <div>
+        <h3>What the provision says</h3>
+        <p>Three short lines of the R1-1 schedule set the limit. The trap is in the
+          definitions behind them: Section 2 lists what counts, and ${Q("permeable pavers")}
+          is on the impermeable list.</p>
+        <p class="hint">Select a surface, in the list or the drawing, to see the text its
+          classification rests on.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <blockquote class="passage">${Q("Maximum area of impermeable materials 75% of the site area")}
+          <cite>R1-1 District Schedule, s.3.2.2.8, p.12 (June 2026)</cite></blockquote>
+        <blockquote class="passage">${Q("The maximum area of impermeable materials includes site coverage for all buildings.")}
+          <cite>R1-1 District Schedule, s.4.2.2, p.16 (June 2026)</cite></blockquote>
+        <blockquote class="passage">${esc(splitSource(R.S2_IMPERMEABLE || "").quote || "")}
+          <cite>Section 2, Impermeable Materials, p.20 (June 2026)</cite></blockquote>
+      </div>`;
+    return;
+  }
+  const src = splitSource(row.source);
+  e.innerHTML = `
+    <div>
+      <h3>${esc(row.label)} &middot; <span class="mono" style="font-weight:500">${m2(row.area_m2)}</span></h3>
+      <p><span class="chip ${row.class}">${esc(CLASS_WORD[row.class])}</span>
+         &nbsp;${esc(row.material)}${row.canonical !== normalise(row.material) ? ` <span class="hint">= ${Q(row.canonical)} in the by-law's words</span>` : ""}</p>
+      <p>${esc(row.reason || (row.class === "impermeable" ? "Named in the Impermeable Materials list." : ""))}</p>
+      ${row.flag ? `<p class="flagline">${esc(row.flag)}</p>` : ""}
+      ${row.outside_m2 > R.OVERLAP_TOLERANCE_M2 ? `<p>${m2(row.outside_m2)} of this surface lies outside the lot and is not counted: s.3.2.2.8 is a share of the <i>site</i> area.</p>` : ""}
+      ${row.overlap_m2 > R.OVERLAP_TOLERANCE_M2 ? `<p>${m2(row.overlap_m2)} of this surface lies under another surface and is counted once, there: Section 2 measures a <i>projected</i> area, one plan projection, not a sum of layers.</p>` : ""}
+      <p class="hint">This is how the tool reads the text. The decisions behind it are recorded in
+        <span class="mono">sources/r1-1-impermeable-extract.md</span>.</p>
+    </div>
+    <div>
+      <blockquote class="passage">${src.quote ? esc(src.quote) : esc(row.source)}
+        <cite>${esc(src.quote ? src.cite : "Neither Section 2 list names it")}</cite></blockquote>
+    </div>`;
+}
+
+/* ---- the 3D drawing -------------------------------------------------------- */
+const VIEW = { buildingH: 7.0, slab: 0.12, columnH: 16.0, columnSize: 6.0, columnGap: 18.0 };
+const LABEL_MIN_WIDTH_M = 6.0;
+const SHORT_WORD = { building: "counts", impermeable: "counts", permeable: "permeable", ground: "not counted" };
+let three = null;
+function initThree() {
+  const host = $("viewport");
+  if (!window.THREE || !THREE.OrbitControls || !THREE.CSS2DRenderer) {
+    host.insertAdjacentHTML("beforeend", `<div class="nogl"><p>The 3D drawing needs the three.js library,
+      which loads from the internet. The calculation and the verdict above still work.</p></div>`);
+    return null;
+  }
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); }
+  catch (err) {
+    host.insertAdjacentHTML("beforeend", `<div class="nogl"><p>This browser could not start WebGL, so the
+      3D drawing is off. The calculation and the verdict above still work.</p></div>`);
+    return null;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0xd9ddd6, 1);
+  host.insertBefore(renderer.domElement, host.firstChild);
+  const labelRenderer = new THREE.CSS2DRenderer();
+  labelRenderer.domElement.className = "labels";
+  $("labels").replaceWith(labelRenderer.domElement);
+  const scene = new THREE.Scene();
+  const sky = new THREE.HemisphereLight(0xffffff, 0x8a8f86, 0.62); sky.position.set(0, 0, 1); scene.add(sky);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.48); sun.position.set(-30, -50, 80); scene.add(sun);
+  const plan = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2000); plan.up.set(0, 1, 0);
+  const axon = new THREE.PerspectiveCamera(32, 1, 0.5, 3000); axon.up.set(0, 0, 1);
+  const planCtl = new THREE.OrbitControls(plan, renderer.domElement);
+  planCtl.enableRotate = false; planCtl.screenSpacePanning = true;
+  const axonCtl = new THREE.OrbitControls(axon, renderer.domElement);
+  axonCtl.maxPolarAngle = Math.PI * 0.49;
+  [planCtl, axonCtl].forEach(c => {
+    c.addEventListener("change", () => draw());
+    c.addEventListener("start", () => { three.userMoved[c === planCtl ? "plan" : "axon"] = true; });
+  });
+  const root = new THREE.Group(); scene.add(root);
+  three = { host, renderer, labelRenderer, scene, plan, axon, planCtl, axonCtl, root,
+            pickables: [], userMoved: { plan: false, axon: false } };
+  new ResizeObserver(() => { resize(); if (!three.userMoved.axon) fitAxon(); draw(); }).observe(host);
+  renderer.domElement.addEventListener("pointerdown", ev => { downAt = [ev.clientX, ev.clientY]; });
+  renderer.domElement.addEventListener("click", onPick);
+  renderer.domElement.addEventListener("pointermove", onHover);
+  resize();
+  return three;
+}
+function resize() {
+  const { host, renderer, labelRenderer, axon } = three;
+  const w = host.clientWidth, h = host.clientHeight;
+  renderer.setSize(w, h); labelRenderer.setSize(w, h);
+  axon.aspect = w / h; axon.updateProjectionMatrix();
+  if (three.planFrame) setPlanFrustum(three.planFrame);
+}
+function setPlanFrustum(f) {
+  const { host, plan } = three;
+  const aspect = host.clientWidth / host.clientHeight;
+  let hw = f.w / 2, hh = f.h / 2;
+  if (hw / hh > aspect) hh = hw / aspect; else hw = hh * aspect;
+  plan.left = -hw; plan.right = hw; plan.top = hh; plan.bottom = -hh;
+  plan.updateProjectionMatrix();
+}
+function activeCamera() { return state.view === "plan" ? three.plan : three.axon; }
+function draw() {
+  if (!three) return;
+  const cam = activeCamera();
+  three.renderer.render(three.scene, cam);
+  three.labelRenderer.render(three.scene, cam);
+}
+function disposeGroup(g) {
+  const labels = [];
+  g.traverse(o => { if (o.isCSS2DObject) labels.push(o); });
+  labels.forEach(o => o.parent && o.parent.remove(o));
+  g.traverse(o => { if (o.geometry) o.geometry.dispose();
+                    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
+  while (g.children.length) g.remove(g.children[0]);
+}
+function label(html, cls, pos, parent, anchor) {
+  const outer = document.createElement("div");
+  const el = document.createElement("div");
+  el.className = "lbl " + (cls || "");
+  el.innerHTML = html;
+  if (anchor === "left") el.style.transform = "translateX(50%)";
+  if (anchor === "right") el.style.transform = "translateX(-50%)";
+  outer.appendChild(el);
+  const o = new THREE.CSS2DObject(outer);
+  o.position.copy(pos);
+  o.userData.inner = el;
+  parent.add(o);
+  return o;
+}
+const mat = (hex, opts) => new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {}));
+const V = (x, y, z) => new THREE.Vector3(x, y, z || 0);
+function lineLoop(pts, z, color, parent, dashed) {
+  const g = new THREE.BufferGeometry().setFromPoints(pts.map(p => V(p[0], p[1], z)).concat([V(pts[0][0], pts[0][1], z)]));
+  const m = dashed ? new THREE.LineDashedMaterial({ color, dashSize: 0.6, gapSize: 0.4 }) : new THREE.LineBasicMaterial({ color });
+  const l = new THREE.Line(g, m);
+  if (dashed) l.computeLineDistances();
+  parent.add(l);
+  return l;
+}
+function prism(pts, z0, z1, material) {
+  const shape = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1])));
+  const g = new THREE.ExtrudeGeometry(shape, { depth: z1 - z0, bevelEnabled: false });
+  const mesh = new THREE.Mesh(g, material);
+  mesh.position.z = z0;
+  return mesh;
+}
+function buildScene(result) {
+  if (!three) return;
+  const { root } = three;
+  disposeGroup(root);
+  three.pickables = [];
+  const site = state.design.site;
+  const f = (site.units === "ft" || site.units === "feet") ? R.FT_TO_M : 1.0;
+  const outlines = outlinesOf(site).map(o => o.map(p => [p[0] * f, p[1] * f]));
+  const pts = outlines.flat();
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+
+  for (const o of outlines) {
+    root.add(prism(o, 0, 0.005, mat(COLOURS.ground)));
+    lineLoop(o, 0.2, 0x1e2a44, root);
+  }
+  const yardMat = new THREE.LineDashedMaterial({ color: 0x8b928a, dashSize: 0.7, gapSize: 0.45 });
+  [[maxy - 4.9, "front yard 4.9 m (orientation only)"], [miny + 10.7, "rear yard 10.7 m (orientation only)"]].forEach(([y, t]) => {
+    const g = new THREE.BufferGeometry().setFromPoints([V(minx, y, 0.03), V(maxx, y, 0.03)]);
+    const l = new THREE.Line(g, yardMat.clone()); l.computeLineDistances(); root.add(l);
+    label(esc(t), "plain", V(minx - 0.4, y, 0.03), root, "right").userData.kind = "plan-only";
+  });
+
+  const rows = result ? result.rows : [];
+  const isPaver = r => r.canonical === "permeable pavers";
+  for (const r of rows) {
+    if (!r.points) continue;
+    const s = state.design.surfaces[r.order] || {};
+    const whatifPerm = state.whatif && isPaver(r);
+    const colourClass = whatifPerm ? "permeable" : r.class;
+    let z0 = 0.01;
+    if (r.class !== "building" && (R.WOOD || []).includes(r.canonical)) z0 = 0.01 + ((s.height_mm || 0) * 1.0) / 1000.0;
+    const top = r.class === "building" ? VIEW.buildingH : z0 + VIEW.slab;
+    const selected = state.selected === r.id;
+    const mesh = prism(r.points, z0, top, mat(COLOURS[colourClass], selected ? { emissive: 0x7a3300, emissiveIntensity: 0.55 } : {}));
+    mesh.userData.id = r.id;
+    root.add(mesh);
+    three.pickables.push(mesh);
+    if (selected) lineLoop(r.points, top + 0.02, 0xcc5500, root);
+    if (r.outside_m2 > R.OVERLAP_TOLERANCE_M2) lineLoop(r.points, top + 0.03, COLOURS.outside, root, true);
+    const pxs = r.points.map(p => p[0]), pys = r.points.map(p => p[1]);
+    const w = Math.max(...pxs) - Math.min(...pxs), d = Math.max(...pys) - Math.min(...pys);
+    const c = V((Math.max(...pxs) + Math.min(...pxs)) / 2, (Math.max(...pys) + Math.min(...pys)) / 2, top + 0.05);
+    const fits = w >= LABEL_MIN_WIDTH_M && d >= 2.5;
+    if (fits || selected) {
+      const dark = colourClass === "building" || colourClass === "impermeable";
+      const extra = r.outside_m2 > R.OVERLAP_TOLERANCE_M2 ? `<br><span class="m">${pyF(r.outside_m2, 2)} m²</span> outside the lot: not counted`
+                  : r.overlap_m2 > R.OVERLAP_TOLERANCE_M2 ? `<br><span class="m">${pyF(r.overlap_m2, 2)} m²</span> under another surface: counted once` : "";
+      const o = label(`<b>${esc(r.label)}</b><br><span class="m">${pyF(r.area_m2, 2)} m²</span> &middot; ${whatifPerm ? "what-if: permeable" : SHORT_WORD[r.class]}${extra}`,
+                      (dark ? "dark" : "") + (selected ? " sel" : ""), c, root);
+      o.userData.kind = "surface-label";
+      o.userData.selected = selected;
+    }
+  }
+  label(`${esc(streetName())} (street)`, "plain", V((minx + maxx) / 2, maxy + 3.2), root);
+  label("lane", "plain", V((minx + maxx) / 2, miny - 2.4), root);
+  label("N &uarr;", "plain", V(minx - 5, maxy + 2), root).userData.kind = "plan-only";
+  label(`${pyF(maxx - minx, 2)} m`, "plain", V((minx + maxx) / 2, maxy + 1.4), root).userData.kind = "plan-only";
+  label(`${pyF(maxy - miny, 2)} m`, "plain", V(minx - 1.8, (miny + maxy) / 2), root, "right").userData.kind = "plan-only";
+  const real = site.site_id ? `Lot: City parcel ${esc(site.site_id)}. Design: illustrative.` : "Lot and design: illustrative.";
+  label(`${real} Yards for orientation; not checked.`, "plain", V((minx + maxx) / 2, miny - 4.2), root).userData.kind = "plan-only";
+
+  buildColumn(result, maxx + VIEW.columnGap, miny + 2.0);
+
+  three.planFrame = { cx: (minx + maxx) / 2, cy: (miny + maxy) / 2 - 0.4, w: (maxx - minx) + 22, h: (maxy - miny) + 13 };
+  const cx = maxx + VIEW.columnGap, cy = miny + 2.0, cs = VIEW.columnSize, H = VIEW.columnH;
+  three.axonPoints = [
+    V(minx, miny - 3, 0), V(maxx, miny - 3, 0), V(minx, maxy + 4, 0), V(maxx, maxy + 4, 0),
+    V(minx, miny, VIEW.buildingH), V(maxx, maxy, VIEW.buildingH),
+    V(cx - 10, cy, H * R.IMPERMEABLE_LIMIT),
+    V(cx, cy - 2, 0), V(cx + cs + 11, cy, 0), V(cx + cs + 11, cy, H * 0.6),
+    V(cx, cy, H + 4.5), V(cx + cs, cy + cs, H + 4.5),
+  ];
+  applyVisibility();
+}
+const STREET_WORDS = ["ave", "avenue", "st", "street", "dr", "drive", "rd", "road", "blvd", "boulevard", "cres", "crescent", "way", "pl", "place", "hwy", "highway"];
+function streetName() {
+  const site = state.design.site;
+  if (site.street) return pyStr(site.street);
+  const parts = pyStr(site.address || "").split(/\s+/).filter(Boolean);
+  if (parts.length >= 2 && /^\d/.test(parts[0]) && parts.slice(1).some(w => STREET_WORDS.includes(w.toLowerCase().replace(/[.,]/g, "")))) return parts.slice(1).join(" ");
+  return "street";
+}
+function buildColumn(r, cx, cy) {
+  const H = VIEW.columnH, s = VIEW.columnSize;
+  const g = new THREE.Group();
+  three.root.add(g);
+  three.columnGroup = g;
+  if (!r || !r.applies) { label(r ? "Not assessed" : "Cannot check", "plain", V(cx + s / 2, cy + s / 2, 1), g); return; }
+  const site = r.site_area_m2;
+  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s, s, H)), new THREE.LineBasicMaterial({ color: 0x8b928a }));
+  frame.position.set(cx + s / 2, cy + s / 2, H / 2);
+  g.add(frame);
+  label(`100% of site &middot; <span class="m">${m2(site)}</span>`, "plain", V(cx + s + 0.8, cy, H), g, "left");
+  const isPaver = x => x.canonical === "permeable pavers";
+  const order = r.rows.filter(x => (x.class === "building" || x.class === "impermeable") && x.area_m2 > 0 && !(state.whatif && isPaver(x)))
+    .sort((a, b) => ((a.class !== "building") - (b.class !== "building")) || (isPaver(a) - isPaver(b)));
+  let z = 0;
+  const labels = [];
+  for (const x of order) {
+    const h = x.area_m2 / site * H;
+    if (h <= 0) continue;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(s, s, h), mat(COLOURS[x.class], state.selected === x.id ? { emissive: 0x7a3300, emissiveIntensity: 0.55 } : {}));
+    mesh.position.set(cx + s / 2, cy + s / 2, z + h / 2);
+    mesh.userData.id = x.id;
+    g.add(mesh);
+    three.pickables.push(mesh);
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s, s, h)), new THREE.LineBasicMaterial({ color: 0xf5f6f2 }));
+    edge.position.copy(mesh.position);
+    g.add(edge);
+    labels.push({ mid: z + h / 2, text: `${esc(x.label)} <span class="m">${pyF(100 * x.area_m2 / site, 1)}%</span>` });
+    z += h;
+  }
+  if (state.whatif && r.pavers_m2 > 0) {
+    // the pavers, drawn as a ghost above the stack: what the name suggests
+    const h = r.pavers_m2 / site * H;
+    const ghost = new THREE.Mesh(new THREE.BoxGeometry(s, s, h), new THREE.MeshBasicMaterial({ color: 0x68843e, transparent: true, opacity: 0.25 }));
+    ghost.position.set(cx + s / 2, cy + s / 2, z + h / 2);
+    g.add(ghost);
+    labels.push({ mid: z + h / 2, text: `pavers, if permeable <span class="m">${pyF(100 * r.pavers_m2 / site, 1)}%</span> &middot; not the by-law` });
+  }
+  const gap = 1.25;
+  for (let i = 1; i < labels.length; i++) labels[i].z = Math.max(labels[i].mid, (labels[i - 1].z ?? labels[i - 1].mid) + gap);
+  labels.forEach(l => { if (l.z === undefined) l.z = l.mid; label(l.text, "", V(cx + s + 1.0, cy, l.z), g, "left"); });
+
+  [[R.IMPERMEABLE_LIMIT, 0xcc5500, 0.42, 2.0, `${pyG(100 * R.IMPERMEABLE_LIMIT)}% limit &middot; s.3.2.2.8<br><span class="m">${m2(R.IMPERMEABLE_LIMIT * site)}</span>`, "limit"],
+   [R.BUILDING_LIMIT, 0x5a5a5a, 0.40, 1.2, `${pyG(100 * R.BUILDING_LIMIT)}% buildings &middot; s.3.2.2.7`, "plain"]]
+    .forEach(([share, col, op, pad, text, cls]) => {
+      const zl = share * H;
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(s + 2 * pad, s + 2 * pad),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }));
+      plane.position.set(cx + s / 2, cy + s / 2, zl);
+      g.add(plane);
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(plane.geometry), new THREE.LineBasicMaterial({ color: col }));
+      edge.position.copy(plane.position);
+      g.add(edge);
+      const failing = share === R.BUILDING_LIMIT && !r.building_pass;
+      const o = label(failing ? text + " &middot; <b>FAIL</b>" : text, failing ? "limit" : cls, V(cx - pad - 0.4, cy - pad, zl), g, "right");
+      if (failing) o.userData.inner.style.color = "#c62828";
+    });
+  const ok = r.impermeable_pass;
+  const shownPct = state.whatif ? pct(r.if_pavers_were_permeable_pct) + " if pavers were permeable" : pct(r.impermeable_pct);
+  const vl = label(`s.3.2.2.8 &middot; ${shownPct} &middot; ${state.whatif ? "NOT THE BY-LAW" : (ok ? "PASS" : "FAIL")}`, "verdict-lbl",
+                   V(cx + s / 2, cy + s / 2, Math.max(z, H) + 2.6), g);
+  vl.userData.inner.style.background = state.whatif ? "#6f7788" : (ok ? "#2e7d32" : "#c62828");
+}
+function applyVisibility() {
+  if (!three) return;
+  const axon = state.view === "axon";
+  if (three.columnGroup) three.columnGroup.traverse(o => { o.visible = axon; });
+  three.root.traverse(o => {
+    if (!o.isCSS2DObject) return;
+    const kind = o.userData.kind;
+    if (isDescendant(o, three.columnGroup)) o.visible = axon;
+    else if (kind === "plan-only") o.visible = !axon;
+    else if (kind === "surface-label") o.visible = o.userData.selected || (state.labels && !axon);
+    else o.visible = true;
+  });
+}
+function isDescendant(o, g) { for (let p = o; p; p = p.parent) if (p === g) return true; return false; }
+function fitPlan() {
+  const f = three.planFrame;
+  three.plan.position.set(f.cx, f.cy, 400);
+  three.planCtl.target.set(f.cx, f.cy, 0);
+  three.plan.zoom = 1;
+  setPlanFrustum(f);
+  three.planCtl.update();
+  three.userMoved.plan = false;
+}
+function fitAxon() {
+  const pts = three.axonPoints;
+  if (!pts || !pts.length) return;
+  const cam = three.axon;
+  const dir = V(-0.42, 0.72, -0.56).normalize();
+  const right = new THREE.Vector3().crossVectors(dir, V(0, 0, 1)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+  const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)), tanH = tanV * cam.aspect;
+  const box = new THREE.Box3().setFromPoints(pts);
+  let c = box.getCenter(new THREE.Vector3());
+  let dist = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    dist = 0;
+    for (const p of pts) {
+      const v = p.clone().sub(c);
+      dist = Math.max(dist, Math.abs(v.dot(right)) / tanH - v.dot(dir), Math.abs(v.dot(up)) / tanV - v.dot(dir));
+    }
+    dist *= 1.06;
+    const eye = c.clone().sub(dir.clone().multiplyScalar(dist));
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of pts) {
+      const v = p.clone().sub(eye), depth = v.dot(dir);
+      const px = v.dot(right) / depth, py = v.dot(up) / depth;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    }
+    c = c.clone().add(right.clone().multiplyScalar((x0 + x1) / 2 * dist)).add(up.clone().multiplyScalar((y0 + y1) / 2 * dist));
+  }
+  cam.position.copy(c.clone().sub(dir.clone().multiplyScalar(dist)));
+  three.axonCtl.target.copy(c);
+  three.axonCtl.update();
+  three.userMoved.axon = false;
+}
+function frameView(keepCamera) {
+  if (!three || !three.planFrame) return;
+  if (!keepCamera) { fitPlan(); fitAxon(); }
+  draw();
+}
+
+/* ---- picking --------------------------------------------------------------- */
+function pickAt(ev) {
+  if (!three) return null;
+  const rect = three.renderer.domElement.getBoundingClientRect();
+  const p = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(p, activeCamera());
+  const hits = rc.intersectObjects(three.pickables.filter(o => isVisible(o)), false);
+  return hits.length ? hits[0].object.userData.id : null;
+}
+function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
+let downAt = null;
+function onPick(ev) {
+  if (downAt && Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 4) return;
+  const id = pickAt(ev);
+  state.selected = id && id !== state.selected ? id : null;
+  update({ keepCamera: true });
+  if (state.selected) {
+    const el = document.querySelector(`.surface[data-id="${CSS.escape(String(state.selected))}"]`);
+    el && el.scrollIntoView({ block: "nearest" });
+  }
+}
+function onHover(ev) { if (three) three.renderer.domElement.style.cursor = pickAt(ev) ? "pointer" : "grab"; }
+
+/* ---- update ---------------------------------------------------------------- */
+let firstFrame = true;
+function update(opts) {
+  opts = opts || {};
+  const d = state.design;
+  let result = null, problems = null;
+  try { result = check(d); }
+  catch (e) { if (e instanceof InputError) problems = e.message.split("\n"); else throw e; }
+  state.result = result; state.problems = problems;
+  renderExampleSeg();
+  renderLot();
+  if (!opts.keepSchedule || !result) renderSchedule(result); else refreshScheduleNumbers(result);
+  if (problems) renderProblems(problems); else renderVerdict(result);
+  renderExplain(result);
+  buildScene(result);
+  frameView(opts.keepCamera && !firstFrame);
+  firstFrame = false;
+}
+function refreshScheduleNumbers(result) {
+  const byId = {};
+  result.rows.forEach(r => { byId[r.id] = r; });
+  document.querySelectorAll(".surface").forEach(el => {
+    const r = byId[el.dataset.id];
+    if (!r) return;
+    el.querySelector(".swatch").style.background = CSS_COL[r.class];
+    el.querySelector(".area").textContent = pyF(r.area_m2, 2) + " m²";
+    const chip = el.querySelector(".fields .chip");
+    chip.className = "chip " + r.class; chip.textContent = CLASS_WORD[r.class];
+    const fl = el.querySelector(".chip.flagged");
+    if (r.flag && !fl) chip.insertAdjacentHTML("afterend", ` <span class="chip flagged" title="${esc(r.flag)}">check</span>`);
+    if (!r.flag && fl) fl.remove();
+    if (fl && r.flag) fl.title = r.flag;
+  });
+  const rest = document.querySelector(".rest");
+  if (rest) { rest.hidden = !(result.unassigned_m2 > 0.005); rest.querySelector(".area").textContent = pyF(result.unassigned_m2, 2) + " m²"; }
+  $("site-area").textContent = "site " + m2(result.site_area_m2);
+}
+
+/* ---- events ---------------------------------------------------------------- */
+$("example-seg").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-ex]");
+  if (!b) return;
+  loadExample(b.dataset.ex);
+  update();
+});
+$("schedule").addEventListener("input", ev => {
+  const t = ev.target, k = t.dataset.k, i = +t.dataset.i;
+  if (!k || Number.isNaN(i) || t.tagName === "SELECT") return;
+  const s = state.design.surfaces[i];
+  if (k.startsWith("rect")) {
+    const j = +k.slice(4), v = parseFloat(t.value);
+    const ok = Number.isFinite(v) && !(j >= 2 && v <= 0);
+    t.setAttribute("aria-invalid", ok ? "false" : "true");
+    if (!ok) return;
+    s.rect[j] = v;
+  } else if (k === "area_m2") {
+    const v = parseFloat(t.value);
+    const ok = Number.isFinite(v) && v > 0;
+    t.setAttribute("aria-invalid", ok ? "false" : "true");
+    if (!ok) return;
+    s.area_m2 = v;
+  } else if (k === "label") {
+    s.label = t.value;
+  } else if (k === "height_mm" || k === "size_cm") {
+    const v = parseFloat(t.value);
+    if (t.value === "" && k === "size_cm") delete s.size_cm;
+    else if (Number.isFinite(v) && (k === "height_mm" ? v >= 0 : v > 0)) s[k] = v;
+    else { t.setAttribute("aria-invalid", "true"); return; }
+    t.setAttribute("aria-invalid", "false");
+  } else return;
+  markEdited();
+  state.selected = s.id;
+  update({ keepSchedule: true, keepCamera: true });
+  document.querySelectorAll(".surface").forEach(el => el.setAttribute("aria-current", el.dataset.id === String(s.id)));
+});
+$("schedule").addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.type === "number" && t.dataset.k) {
+    const s = state.design.surfaces[+t.dataset.i], k = t.dataset.k;
+    const stored = k.startsWith("rect") ? s.rect[+k.slice(4)] : s[k];
+    if (t.getAttribute("aria-invalid") === "true" || (t.value === "" && k !== "size_cm")) {
+      t.value = stored === undefined ? "" : stored;
+      t.setAttribute("aria-invalid", "false");
+    }
+    return;
+  }
+  if (t.tagName !== "SELECT") return;
+  const s = state.design.surfaces[+t.dataset.i], k = t.dataset.k;
+  if (k === "material") {
+    s.material = t.value;
+  } else if (["spaced", "on_grade", "impermeable_layer"].includes(k)) {
+    if (t.value === "") delete s[k]; else s[k] = t.value === "true";
+  } else return;
+  markEdited();
+  state.selected = s.id;
+  const i = t.dataset.i;
+  update({ keepCamera: true });
+  const again = document.querySelector(`select[data-i="${i}"][data-k="${k}"]`);
+  if (again) again.focus();
+});
+$("schedule").addEventListener("click", ev => {
+  const del = ev.target.closest("[data-del]");
+  if (del) {
+    const i = +del.dataset.del;
+    const [gone] = state.design.surfaces.splice(i, 1);
+    if (gone && state.selected === gone.id) state.selected = null;
+    markEdited();
+    update({ keepCamera: true });
+    return;
+  }
+  const row = ev.target.closest(".surface");
+  if (row && !ev.target.closest("input,select,button,label,textarea,.fields")) {
+    const id = state.design.surfaces.find(s => String(s.id) === row.dataset.id)?.id ?? row.dataset.id;
+    state.selected = state.selected === id ? null : id;
+    update({ keepSchedule: false, keepCamera: true });
+  }
+});
+$("schedule").addEventListener("focusin", ev => {
+  const row = ev.target.closest(".surface");
+  if (row && String(state.selected) !== row.dataset.id) {
+    state.selected = state.design.surfaces.find(s => String(s.id) === row.dataset.id)?.id ?? row.dataset.id;
+    document.querySelectorAll(".surface").forEach(el => el.setAttribute("aria-current", el.dataset.id === row.dataset.id));
+    if (state.result) { renderExplain(state.result); buildScene(state.result); draw(); }
+  }
+});
+$("add-surface").addEventListener("click", () => {
+  const ids = new Set(state.design.surfaces.map(s => String(s.id)));
+  let n = state.design.surfaces.length + 1;
+  while (ids.has("s" + n)) n++;
+  const b = bbox(state.design.site);
+  state.design.surfaces.push({ id: "s" + n, label: "New surface", material: "concrete",
+                               rect: [+((b.minx + b.maxx) / 2 - 1.5).toFixed(2), +((b.miny + b.maxy) / 2 - 1.5).toFixed(2), 3, 3] });
+  state.selected = "s" + n;
+  markEdited();
+  update({ keepCamera: true });
+});
+$("view-plan").addEventListener("click", () => setView("plan"));
+$("view-axon").addEventListener("click", () => setView("axon"));
+function setView(v) {
+  state.view = v;
+  $("view-plan").setAttribute("aria-pressed", v === "plan");
+  $("view-axon").setAttribute("aria-pressed", v === "axon");
+  if (three) { three.planCtl.enabled = v === "plan"; three.axonCtl.enabled = v === "axon"; }
+  applyVisibility();
+  draw();
+}
+$("toggle-labels").addEventListener("click", ev => {
+  state.labels = !state.labels;
+  ev.currentTarget.setAttribute("aria-pressed", state.labels);
+  ev.currentTarget.textContent = state.labels ? "Labels on" : "Labels off";
+  applyVisibility(); draw();
+});
+function resultText(r) {
+  const d = displayOf(r);
+  const L = [];
+  L.push(`${r.address || "Lot"} -- ${r.name || ""}`);
+  L.push(`R1-1 s.3.2.2.8 check, ${r.version || ""}. Site area ${d.site} m2 (parcel polygon). Use: ${r.use}.`);
+  if (!r.applies) { L.push(`NOT ASSESSED. ${r.why_not}`); }
+  else {
+    for (const x of r.rows) {
+      const word = { building: "IMPERMEABLE (building)", impermeable: "IMPERMEABLE", permeable: "permeable", ground: "not counted" }[x.class];
+      L.push(`  ${x.label}: ${x.material}, ${pyF(x.area_m2, 2)} m2, ${word}${x.flag ? "  ! " + x.flag : ""}`);
+    }
+    if (r.unassigned_m2 > 0.005) L.push(`  (rest of lot): nothing drawn, ${pyF(r.unassigned_m2, 2)} m2, not counted`);
+    L.push(`s.3.2.2.7 buildings ${d.building} m2 = ${d.building_pct}% (limit ${pyG(100 * R.BUILDING_LIMIT)}%)  ${r.building_pass ? "PASS" : "FAIL"}`);
+    L.push(`s.3.2.2.8 impermeable ${d.impermeable} m2 = ${d.impermeable_pct}% (limit ${pyG(100 * R.IMPERMEABLE_LIMIT)}% = ${d.limit} m2)  ${r.impermeable_pass ? "PASS" : "FAIL"}`);
+    L.push(r.impermeable_pass ? `  ${d.margin} m2 of impermeable surface still available.` : `  Over by ${d.margin} m2.`);
+    if (r.pavers_m2 > 0) L.push(`If permeable pavers counted as permeable the total would be ${pct(r.if_pavers_were_permeable_pct)}. They do not: Section 2 names them as impermeable.`);
+  }
+  r.warnings.forEach(w => L.push(`WARNING: ${w}`));
+  r.notes.forEach(n => L.push(`NOTE: ${n}`));
+  L.push("Sources: R1-1 District Schedule s.3.2.2.7, s.3.2.2.8, s.4.2.2 (June 2026); Section 2 Impermeable Materials p.20, Permeable Materials p.31 (June 2026).");
+  return L.join("\n");
+}
+$("copy-result").addEventListener("click", async ev => {
+  if (!state.result) return;
+  const text = resultText(state.result);
+  try { await navigator.clipboard.writeText(text); ev.currentTarget.textContent = "Copied"; }
+  catch (e) { $("json-text").value = text; $("json-text").closest("details").open = true; ev.currentTarget.textContent = "Shown below"; }
+  setTimeout(() => { $("copy-result").textContent = "Copy result as text"; }, 1800);
+});
+$("copy-json").addEventListener("click", async () => {
+  const text = JSON.stringify(state.design, null, 1);
+  const ta = $("json-text");
+  ta.value = text;
+  try { await navigator.clipboard.writeText(text); $("json-msg").className = "ok"; $("json-msg").textContent = "Copied, and shown below."; }
+  catch (e) { ta.select(); $("json-msg").className = "hint"; $("json-msg").textContent = "Shown below and selected: copy it with Cmd+C or Ctrl+C."; }
+});
+$("load-json").addEventListener("click", () => {
+  const msg = $("json-msg");
+  let d;
+  try { d = JSON.parse($("json-text").value); }
+  catch (e) { msg.className = "err"; msg.textContent = "That is not valid JSON: " + e.message; return; }
+  const problems = validate(d);
+  if (problems.length) { msg.className = "err"; msg.textContent = problems.join(" "); return; }
+  state.design = d; state.selected = null; state.edited = true; state.whatif = false;
+  update();
+  msg.className = "ok";
+  msg.textContent = `Loaded ${d.surfaces.length} surface${d.surfaces.length === 1 ? "" : "s"}.`;
+});
+
+/* ---- start ------------------------------------------------------------------ */
+(function start() {
+  const par = $("parity");
+  if (!window.TOOL_DATA) {
+    par.className = "parity bad";
+    par.textContent = "data.js is missing, so this page has no rules to apply. Run: python3 tool/export_web_data.py";
+    $("verdict").innerHTML = `<p class="err">tool/web/data.js is missing. It is written by <span class="mono">python3 tool/export_web_data.py</span>, and this page cannot run without it.</p>`;
+    return;
+  }
+  const p = runParity();
+  if (p.bad.length) {
+    par.className = "parity bad";
+    par.innerHTML = `This page disagrees with the Python tool on <b>${p.bad.length}</b> of ${p.nc + p.nl + p.nv + p.nf} cases.`;
+    const b = $("parity-banner");
+    b.hidden = false;
+    b.textContent = `Do not rely on these numbers: this page's calculation disagrees with tool/impermeable_check.py on ${p.bad.length} test cases. Details are in the browser console.`;
+    console.warn("Parity failures (first 10):", p.bad.slice(0, 10));
+  } else {
+    par.className = "parity good";
+    par.innerHTML = `<b>Matches the Python tool</b> on all ${p.nc} material cases, ${p.nl} test lots,
+      ${p.nv} refused inputs and ${p.nf.toLocaleString("en")} printed numbers, rechecked on every load. Tool version ${esc(R.VERSION || "")}.`;
+  }
+  window.__parity = p;
+  if (state.exampleKey) loadExample(state.exampleKey);
+  else state.design = { name: "Empty lot", site: { address: "", outline: [[0, 0], [15, 0], [15, 37], [0, 37]] }, surfaces: [] };
+  initThree();
+  setView("plan");
+  update();
+})();
+</script>
+</body>
+</html>
