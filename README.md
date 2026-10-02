@@ -7,57 +7,61 @@ Kevin Jinn · Instructor: Xun Liu · Phase 1, Weeks 1–4
 
 ## Purpose
 
-<!-- Kevin: the brief says this section is written by you, 150 words or
-     fewer, naming who the tool is for. The paragraph below adapts your W1
-     wording to the map and runs to about 120 words; edit it or replace it,
-     then delete this comment. -->
-
-An interactive map that explains one provision of Vancouver's R1-1 District
-Schedule — the 75% cap on impermeable materials — and shows, for every
-ordinary R1-1 lot in the city, how much of that allowance the existing house
-has already used and how much is left for driveways, walks, patios and decks.
-It is for landscape designers preparing residential permit sets.
-
-The provision is three lines long. The part worth building a tool around is
-not the number but the definition behind it: under Section 2 of the Zoning and
-Development By-law, **permeable pavers count as impermeable**, and **wood
-decking counts as permeable only if the boards are spaced**, on grade, with
-nothing under them. A designer specifying a paver driveway to improve drainage
-gains nothing against this limit. The map lets you see that: set a driveway as
-permeable pavers and the lot's bar reads exactly as it would for concrete; a
-dotted mark shows where the lot would sit if the by-law agreed with the name.
+This tool helps test the compliance for R1-1 homes to comply with the Vancouver
+Impermeability Bylaw (Zoning and Development By-law No. 3575, R1-1 District Schedule
+s.3.2.2.8 and the Section 2 definitions).
+Designers can check the percentage of lots and see visual data about the
+coverage of R1-1 roof sizes. It can help inform designers how much allowable
+impermeable materials can be added to the landscape when they go to design the
+lot while keeping in compliance with the Impermeability Bylaw. It also allows
+you to take that lot and draw into rhino for 3d modelling of the landscape. It
+also shows the amount of stormwater that the lots can hold, helping planners
+evaluate the effectiveness of the impermeability law based on how much
+allowable hardscape can be on a lot in response to climate change and Rain City
+Strategy climate goals.
 
 ## How to use it
 
-**In a browser.** Open the [live map](https://kevinjinn6.github.io/arch540-impermeable-materials/).
-It needs an internet connection for the basemap and loads about 8 MB
-(compressed) of lot data before the lot card fills in.
+**In a browser.** Open the [live map](https://kevinjinn6.github.io/arch540-impermeable-materials/)
+on a laptop (it works on a phone, but the panel is easier on a wide screen).
+It needs an internet connection and loads about 8 MB of lot data; the lot
+card fills in once it has loaded, opening on 3528 W 30th Ave.
 
-1. **Pick a lot.** Click one, or start typing a civic address the City's way
-   (`3528 W 30TH AV`; suggestions appear). The card leads with the answer:
-   the bar is the site as 100%, marked at 50% and 75% (dark is roof, red is
-   paving, blue is room, purple is over the limit), then PASS or FAIL with
-   the margin in square metres. Under it: the 2015 roofs to the walls, the
-   50% rule, and the room s.3.2.2.8 leaves after the roofs. Tap any blue
-   reference such as *s.3.2.2.8 · p.12* to read the passage in place.
-2. **Fill in what else is on the lot.** Under *Paving*, three illustrative
-   surfaces are prefilled; change the material (named in the by-law's words)
-   and the square metres. Each row says whether it counts, with the page;
-   the pavers row says *Counts, despite the name*, and a dotted mark on the
-   bar shows where the lot would sit if pavers were permeable. *Check the
-   arithmetic* shows the sum to verify by hand.
-3. **Try the city.** Switch to *Every lot*. The slider sets the same
-   impermeable share on every lot, from an empty lot at 0% to 100%. A house
-   appears once its 2015 roofs fit within that share; the mark at 75% is the
-   by-law maximum, and past it every lot fails by the purple stripe. The
-   purple tick is the selected lot's own roof share.
-4. **Read the rule.** *The by-law, verbatim*, at the foot of the panel, holds
-   s.3.2.2.7, s.3.2.2.8 and s.4.2.2 and the Section 2 definitions word for
-   word with their pages in the June 2026 consolidation, then the
+1. **Pick a lot.** Click a lot on the map, or type a civic address in the
+   search box the City's way (`3528 W 30TH AV`; suggestions appear as you
+   type) and press Enter. The map flies to it and draws a dashed line around
+   it. The card leads with the answer: a bar where the whole site is 100%,
+   marked at 50% and 75% (dark is roof, red is paving, blue is room left,
+   purple is over the limit), then **PASS** or **FAIL** with the margin in
+   square metres. Under it: the 2015 roofs measured to the walls, the 50%
+   buildings rule, and the room s.3.2.2.8 leaves after the roofs. Tap any
+   blue reference, such as *s.3.2.2.8 · p.12*, to read that passage in place.
+2. **Fill in what else is on the lot.** Under *Paving*, three example
+   surfaces are filled in (a driveway in permeable pavers, walks in concrete,
+   a deck). They are examples, not measurements. Rename a surface by typing
+   over its name, change its square metres, or pick its material from the
+   list (named in the by-law's words). Each row says whether that material
+   counts, with the page. **+ Add a surface** adds a row, the ⊖ button
+   removes one (with *Undo* for a few seconds), and *Reset to the example*
+   puts the three rows back. The bar, the PASS/FAIL and the lot on the map
+   all update as you type. The pavers row reads *Counts, despite the name*,
+   and a small dotted mark on the bar shows where the lot would sit if
+   pavers were permeable. *Check the arithmetic* shows the sum so you can
+   check it by hand. The schedule starts again for each new lot.
+3. **Try the whole city.** Switch to **Every lot**. The slider sets the same
+   impermeable share on every lot at once, from 0% (an empty lot) to 100%.
+   A house appears once its roofs fit within that share; the mark at 75% is
+   the by-law maximum, and past it every lot shows a purple stripe for the
+   share over the limit. The purple tick on the slider is the selected lot's
+   own roof share. *Change ›* goes back to pick another lot.
+4. **See the storm water.** *48 mm storm* in Every lot, and *Storm* in a
+   lot's card, show how much of a 48 mm rain day the lots could hold. This
+   comes from the Rain City Strategy, a Council policy, **not the by-law**;
+   its assumptions are written beside it.
+5. **Read the rule.** *The by-law, verbatim*, at the foot of the panel,
+   quotes s.3.2.2.7, s.3.2.2.8, s.4.2.2 and the Section 2 definitions word
+   for word, with their pages in the June 2026 consolidation, then the
    assumptions and the sources.
-5. **The storm card is not the by-law.** It is a Rain City Strategy water
-   balance kept as context (behind *48 mm storm* in Every lot, and *Storm*
-   in a lot's card), with its assumptions written beside it.
 
 **Locally.** The page needs a small web server to load its data files:
 
@@ -65,8 +69,13 @@ It needs an internet connection for the basemap and loads about 8 MB
 cd map && python3 -m http.server      # then open http://localhost:8000
 ```
 
-**In Rhino 8.** Type `ScriptEditor`, open `map/rhino_site.py`, set `ADDRESSES`
-to the lot(s) you want, press **Run**. It draws the site, its 2015 roofs
+**In Rhino 8.** Download or clone this repository (green **Code** button on
+GitHub → *Download ZIP*, then unzip it). In Rhino 8 type `ScriptEditor` and
+press Enter, open `map/rhino_site.py`, and near the top change
+`ADDRESSES = ["3528 W 30TH AV"]` to the address(es) you want, spelled as in
+the map's search box (the lot card's *Draw it in Rhino* row shows the exact
+spelling). Press **Run**. The script reads `map/data/`, so keep the folder
+together. It draws the site, its 2015 roofs
 raised to their recorded heights, the eave allowance inside each roof, and an
 *area bar* beside the site marked at 50% and 75%, with the room left for
 paving. Named views `R1-1 map Plan - …` and `R1-1 map Axon - …` are saved. The
@@ -124,10 +133,16 @@ lots: 60 m² of concrete puts 157 lots over 75%; 90 m² puts 1,374 over; 120 m²
 puts 10,944 over. The same square metres of permeable pavers give exactly the
 same counts. Gravel leaves one lot over, whose roof alone exceeds 75%.
 
-<!-- Kevin: the brief wants a screenshot of the tool itself here. Open the
-     live map on 3528 W 30th Ave, screenshot the panel and the lot, save it as
-     output/map-3528-w-30th-ave.png and replace this comment with
-     ![The map on 3528 W 30th Ave](output/map-3528-w-30th-ave.png) -->
+**Input:** search `3528 W 30TH AV`; leave the example paving as it is.
+**Result:** PASS, 132.3 m² spare. The selected lot on the map shows the same
+split as its bar.
+
+![The map on 3528 W 30th Ave: the lot card reads PASS, 132.3 m² spare, with the bar marked at 50% and 75% and the example paving schedule; the lot is outlined with a dashed line on the map](output/map-3528-w-30th-ave.png)
+
+The same lot in *Every lot* with the slider at the 75% by-law maximum:
+61,356 of 61,357 houses fit; the purple tick is this lot's roofs at 39.4%.
+
+![Every lot mode at 75%: the citywide map in red and blue, the slider at the by-law maximum, and 61,356 of 61,357 houses fit](output/map-every-lot-75.png)
 
 ![The same lot drawn by map/rhino_site.py in Rhino 8: the site with its 2015 roofs and the eave allowance, and the area bar marked at 50% and 75%](output/3528-w-30th-ave-map-plan.png)
 

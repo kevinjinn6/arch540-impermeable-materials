@@ -216,8 +216,20 @@ WHERE THE DATA COMES FROM
   .amt input { width: 64px; height: 36px; border: 0; border-radius: 8px; background: var(--fill); text-align: right; padding: 0 8px;
     font: inherit; color: var(--ink); font-variant-numeric: tabular-nums; }
   .amt input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .rm { border: 0; background: transparent; padding: 0; width: 24px; height: 24px; display: inline-flex; align-items: center;
-    justify-content: center; color: var(--ink-3); cursor: pointer; }
+  /* 44 px to the finger, with the icon kept at the row's right edge and clear of the number */
+  .rm { border: 0; background: transparent; padding: 0; width: 44px; height: 44px; margin: -4px -13px -4px 4px; display: inline-flex;
+    align-items: center; justify-content: center; color: var(--ink-3); cursor: pointer; }
+  .rm:hover { color: var(--fail); }
+  /* The surface's name: plain text until touched */
+  .lbl { flex: 1 1 0; min-width: 0; height: 36px; margin-left: -6px; padding: 0 6px; border: 0; border-radius: 8px; background: transparent;
+    font: inherit; color: var(--ink); box-shadow: inset 0 -1px 0 var(--rule); text-overflow: ellipsis; }
+  .lbl::placeholder { color: var(--ink-3); }
+  .lbl:hover { background: var(--fill); }
+  .lbl:focus { background: var(--fill); box-shadow: none; outline: 2px solid var(--accent); outline-offset: 1px; }
+  .undo { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: var(--row); margin-top: 8px;
+    padding: 0 12px; border-radius: 10px; background: var(--fill); }
+  .undo span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sec .linkbtn.caption { color: var(--accent); }
   .sel { display: inline-flex; align-items: center; gap: 2px; flex: 1 1 0; min-width: 0; }   /* basis 0, so it shrinks before the row wraps */
   .sel select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; padding: 0; font: inherit; color: var(--ink);
     width: 100%; min-width: 0; cursor: pointer; text-overflow: ellipsis; }
@@ -631,40 +643,45 @@ map.on("error", e => {
 // Each lot is sent once with four numbers per corner: position, its north-south
 // position within the lot, and two per-lot values the slider does not change:
 //   a_roof   roof share to the walls, 0-1           a_A  site area, m²
-//   a_sc     0 assessed, 1 not assessed (grey)
+//   a_sc     0 assessed, 1 not assessed (grey)    a_id lot number, 1 up
 // u_scenario is 1 in Every-lot mode: each lot is then hard up to u_hard (the
 // slider, 0-1), red up to 75% and a purple stripe for the share past 75%. In
-// One-lot mode (0) each lot shows its own roofs, purple if they pass 75%.
+// One-lot mode (0) each lot shows its own roofs, purple if they pass 75%;
+// the selected lot (u_sel) shows its roofs plus the card's paving (u_selShare),
+// red to 75% and a purple stripe past it, the same split as its bar.
 const LOT_SHADER = {
   vertex: `
     precision highp float;
-    attribute vec2 a_pos; attribute float a_y; attribute float a_sc; attribute float a_roof; attribute float a_A;
+    attribute vec2 a_pos; attribute float a_y; attribute float a_sc; attribute float a_roof; attribute float a_A; attribute float a_id;
     uniform mat4 u_matrix;
-    varying float v_y, v_sc, v_roof, v_A;
-    void main() { gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0); v_y = a_y; v_sc = a_sc; v_roof = a_roof; v_A = a_A; }`,
+    varying float v_y, v_sc, v_roof, v_A, v_id;
+    void main() { gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0); v_y = a_y; v_sc = a_sc; v_roof = a_roof; v_A = a_A; v_id = a_id; }`,
   fragment: `
     precision highp float;
-    uniform float u_hard, u_scenario, u_limit, u_opacity;
+    uniform float u_hard, u_scenario, u_limit, u_opacity, u_sel, u_selShare;
     uniform vec3 u_permeable, u_impermeable, u_over, u_out;
-    varying float v_y, v_sc, v_roof, v_A;
+    varying float v_y, v_sc, v_roof, v_A, v_id;
     void main() {
       vec3 c;
+      bool picked = u_scenario < 0.5 && u_sel > 0.5 && abs(v_id - u_sel) < 0.5;
+      float hard = u_scenario > 0.5 ? u_hard : u_selShare;
       if (v_sc > 0.5) c = u_out;
-      else if (u_scenario > 0.5)
-        c = v_y >= 1.0 - u_limit ? (v_y >= 1.0 - u_hard ? u_impermeable : u_permeable)
-          : (v_y >= 1.0 - u_hard ? u_over : u_permeable);
+      else if (u_scenario > 0.5 || picked)
+        c = v_y >= 1.0 - u_limit ? (v_y >= 1.0 - hard ? u_impermeable : u_permeable)
+          : (v_y >= 1.0 - hard ? u_over : u_permeable);
       else c = v_roof > u_limit + 1e-6 ? u_over : (v_y >= 1.0 - v_roof ? u_impermeable : u_permeable);
       gl_FragColor = vec4(c * u_opacity, u_opacity);
     }`,
 };
 const hexToRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 const ORIGIN = maplibregl.MercatorCoordinate.fromLngLat([-123.12, 49.25]);
-const FLOATS = 6;
+const FLOATS = 7;
 
 function buildLotMesh(features) {
   const verts = [], idx = [];
-  for (const f of features) {
+  features.forEach((f, n) => {
     const p = f.properties;
+    p._mi = n + 1;                           // the lot's number on the graphics card
     const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates]
                 : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
     let minY = Infinity, maxY = -Infinity;
@@ -685,12 +702,12 @@ function buildLotMesh(features) {
       });
       const base = verts.length / FLOATS, tri = [];
       for (let i = 0; i < flat.length; i += 3) {
-        verts.push(flat[i], flat[i + 1], flat[i + 2], p.assessed ? 0 : 1, roof, p.A);
+        verts.push(flat[i], flat[i + 1], flat[i + 2], p.assessed ? 0 : 1, roof, p.A, p._mi);
         tri.push(flat[i], flat[i + 1]);
       }
       for (const k of earcut(tri, holes)) idx.push(base + k);
     }
-  }
+  });
   return { verts: new Float32Array(verts), idx: new Uint32Array(idx) };
 }
 
@@ -714,7 +731,7 @@ function lotLayer(mesh) {
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_permeable", "u_impermeable", "u_over", "u_out"])
+      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_permeable", "u_impermeable", "u_over", "u_out"])
         loc[u] = gl.getUniformLocation(prog, u);
       vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
       this.bindVAO(vao);
@@ -722,7 +739,7 @@ function lotLayer(mesh) {
       gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
       const ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.idx, gl.STATIC_DRAW);
-      [["a_pos", 2, 0], ["a_y", 1, 8], ["a_sc", 1, 12], ["a_roof", 1, 16], ["a_A", 1, 20]].forEach(([name, size, offset]) => {
+      [["a_pos", 2, 0], ["a_y", 1, 8], ["a_sc", 1, 12], ["a_roof", 1, 16], ["a_A", 1, 20], ["a_id", 1, 24]].forEach(([name, size, offset]) => {
         const a = gl.getAttribLocation(prog, name);
         gl.enableVertexAttribArray(a);
         gl.vertexAttribPointer(a, size, gl.FLOAT, false, FLOATS * 4, offset);
@@ -738,6 +755,8 @@ function lotLayer(mesh) {
       gl.uniform1f(loc.u_scenario, state.mode === "city" ? 1 : 0);
       gl.uniform1f(loc.u_limit, BYLAW.impermeable_limit);
       gl.uniform1f(loc.u_opacity, LOT_OPACITY);
+      gl.uniform1f(loc.u_sel, state.lotResult ? state.selected.properties._mi || 0 : 0);
+      gl.uniform1f(loc.u_selShare, state.lotResult ? state.lotResult.share : 0);
       gl.uniform3fv(loc.u_permeable, hexToRGB(COLOR.permeable));
       gl.uniform3fv(loc.u_impermeable, hexToRGB(COLOR.impermeable));
       gl.uniform3fv(loc.u_over, hexToRGB(OVER));
@@ -998,37 +1017,96 @@ function renderLot() {
   if (flags.length) html += `<p class="caption" style="margin:4px 0 0">${cap(flags.join(". "))}.</p>`;
 
   // The schedule: one row per surface, classified in the by-law's words.
-  html += `<div class="sec"><h2>Paving</h2><span class="caption">Illustrative. Edit it.</span></div><ul class="sched" id="sched">`;
+  // The figures are examples, not measurements, and start again for each lot.
+  html += `<div class="sec"><h2>Paving</h2><button type="button" class="linkbtn caption" id="resetSched"${scheduleEdited() ? "" : " hidden"}>Reset to the example</button></div>` +
+    `<p class="caption" style="margin:2px 0 0">Example figures, not measured. Edit them; they start again for each lot you pick.</p><ul class="sched" id="sched">`;
   state.schedule.forEach((row, i) => {
-    const m = MAT[row.id];
+    const m = MAT[row.id], name = esc(row.label || "this surface");
+    row.uid ??= ++rowSeq;
     html += `<li class="srow">` +
-      `<div class="srow-top"><label for="m2-${i}">${row.label}</label><span class="amt">` +
-      `<input id="m2-${i}" data-i="${i}" type="number" min="0" step="1" value="${row.m2}" aria-label="${row.label} area in square metres"><span class="caption">m²</span>` +
-      `<button type="button" class="rm" data-i="${i}" aria-label="Remove ${row.label}"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="9" r="7"></circle><path d="M5.5 9h7" stroke-linecap="round"></path></svg></button></span></div>` +
-      `<div class="srow-bot"><span class="sel"><select data-i="${i}" aria-label="${row.label} material">${materialOptions(row.id)}</select>${CHEVD}</span>` +
-      `<details class="cls"><summary class="caption"><span class="dot ${m.counts ? "imp" : "perm"}"></span>${clsLabel(m)}</summary>` +
+      `<div class="srow-top"><input class="lbl" data-i="${i}" type="text" maxlength="40" value="${esc(row.label)}" placeholder="Name this surface" aria-label="Surface name"><span class="amt">` +
+      `<input id="m2-${i}" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" value="${row.m2}" aria-label="${name} area in square metres"><span class="caption">m²</span>` +
+      `<button type="button" class="rm" data-i="${i}" aria-label="Remove ${name}"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="9" r="7"></circle><path d="M5.5 9h7" stroke-linecap="round"></path></svg></button></span></div>` +
+      `<div class="srow-bot"><span class="sel"><select data-i="${i}" aria-label="${name} material">${materialOptions(row.id)}</select>${CHEVD}</span>` +
+      `<details class="cls" data-k="cls-${row.uid}"><summary class="caption"><span class="dot ${m.counts ? "imp" : "perm"}"></span><span class="lab">${clsLabel(m)}</span></summary>` +
       `<div class="caption why">${cap(m.why)}.</div></details></div></li>`;
   });
-  html += `</ul><button type="button" class="linkbtn" id="addRow" style="display:flex;align-items:center;height:var(--row)">+ Add a surface</button>`;
+  html += `</ul>`;
+  // A removed row can be put back for a few seconds.
+  if (state.removed) html += `<div class="undo" id="undoBar" role="status"><span>Removed “${esc(state.removed.row.label || "surface")}”</span>` +
+    `<button type="button" class="linkbtn" id="undoRm">Undo</button></div>`;
+  html += `<button type="button" class="linkbtn" id="addRow" style="display:flex;align-items:center;height:var(--row)">+ Add a surface</button>`;
   html += `<div class="fact-row total"><span>Roofs + paving</span><span class="num" id="totalOut"></span></div>`;
   html += `<div class="rows">` +
     `<details class="row"><summary>Check the arithmetic${CHEV}</summary><div class="hand" id="handCheck"></div></details>` +
     `<details class="row"><summary><span>Storm <span class="caption">· Council policy, not the by-law</span></span>${CHEV}</summary><div class="caption pad" id="lotStorm"></div></details>` +
     `<details class="row"><summary>Draw it in Rhino${CHEV}</summary><div class="caption pad">Set ADDRESSES to “${p.ad}” in <code>map/rhino_site.py</code> and run it in Rhino. It draws the site, its 2015 roofs and this bar.</div></details>` +
     `</div>`;
+  // A rebuild of the same lot keeps whatever the reader had opened.
+  const sameLot = el.dataset.lot === p.k;
+  const openFixed = sameLot ? [...el.querySelectorAll("details:not(.cls)")].map(d => d.open) : [];
+  const openRows = sameLot ? new Set([...el.querySelectorAll("details.cls[open]")].map(d => d.dataset.k)) : new Set();
   el.innerHTML = html;
+  el.dataset.lot = p.k;
+  el.querySelectorAll("details:not(.cls)").forEach((d, k) => { if (openFixed[k]) d.open = true; });
+  el.querySelectorAll("details.cls").forEach(d => { if (openRows.has(d.dataset.k)) d.open = true; });
 
+  // A new material changes only its own row and the figures, so nothing closes.
   el.querySelectorAll("select").forEach(sel => sel.addEventListener("change", e => {
-    state.schedule[+e.target.dataset.i].id = e.target.value; renderLot();
+    const m = MAT[e.target.value];
+    state.schedule[+e.target.dataset.i].id = m.id;
+    const cls = e.target.closest(".srow").querySelector(".cls");
+    cls.querySelector(".dot").className = `dot ${m.counts ? "imp" : "perm"}`;
+    cls.querySelector(".lab").textContent = clsLabel(m);
+    cls.querySelector(".why").textContent = `${cap(m.why)}.`;
+    scheduleChanged();
   }));
   el.querySelectorAll("input[type=number]").forEach(inp => inp.addEventListener("input", e => {
     state.schedule[+e.target.dataset.i].m2 = Math.max(0, Number(e.target.value) || 0);
-    renderLotTotals();                       // only the figures move; the field keeps focus
+    scheduleChanged();                       // only the figures move; the field keeps focus
+  }));
+  el.querySelectorAll("input.lbl").forEach(inp => inp.addEventListener("input", e => {
+    const i = +e.target.dataset.i, li = e.target.closest(".srow"), name = e.target.value.trim();
+    state.schedule[i].label = name;
+    const n = name || "this surface";
+    li.querySelector("input[type=number]").setAttribute("aria-label", `${n} area in square metres`);
+    li.querySelector("select").setAttribute("aria-label", `${n} material`);
+    li.querySelector(".rm").setAttribute("aria-label", `Remove ${n}`);
+    scheduleChanged();
   }));
   el.querySelectorAll(".rm").forEach(b => b.addEventListener("click", e => {
-    state.schedule.splice(+e.currentTarget.dataset.i, 1); renderLot();
+    const i = +e.currentTarget.dataset.i;
+    clearTimeout(state.removed?.timer);
+    state.removed = { row: state.schedule.splice(i, 1)[0], i,
+      timer: setTimeout(() => { state.removed = null; $("undoBar")?.remove(); }, UNDO_MS) };
+    renderLot();
+    $("undoRm")?.focus();
   }));
-  $("addRow").addEventListener("click", () => { state.schedule.push({ label: "Another surface", id: "concrete", m2: 0 }); renderLot(); });
+  $("undoRm")?.addEventListener("click", () => {
+    const { row, i, timer } = state.removed; clearTimeout(timer); state.removed = null;
+    state.schedule.splice(Math.min(i, state.schedule.length), 0, row);
+    renderLot();
+  });
+  $("resetSched").addEventListener("click", () => { resetSchedule(); renderLot(); });
+  $("addRow").addEventListener("click", () => {
+    dropUndo();
+    state.schedule.push({ label: "", id: "concrete", m2: 0 });
+    renderLot();
+    const names = el.querySelectorAll("input.lbl"); names[names.length - 1]?.focus();
+  });
+  renderLotTotals();
+}
+
+// The schedule helpers: the example rows, whether they have been edited, the undo.
+let rowSeq = 0;
+const UNDO_MS = 8000;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const scheduleEdited = () => state.schedule.length !== DEFAULT_SCHEDULE.length ||
+  state.schedule.some((r, i) => r.label !== DEFAULT_SCHEDULE[i].label || r.id !== DEFAULT_SCHEDULE[i].id || r.m2 !== DEFAULT_SCHEDULE[i].m2);
+function dropUndo() { clearTimeout(state.removed?.timer); state.removed = null; }
+function resetSchedule() { dropUndo(); state.schedule = DEFAULT_SCHEDULE.map(r => ({ ...r })); }
+function scheduleChanged() {
+  const b = $("resetSched"); if (b) b.hidden = !scheduleEdited();
   renderLotTotals();
 }
 
@@ -1065,6 +1143,7 @@ function renderLotTotals() {
     `(${Math.round(STORM.runoff * 100)}% runoff, ${STORM.soil_mm} mm soil). ${STORM.policy}; R1-1 has no retention rule.`;
   state.lotResult = { s, t, total, share, overBy, over };
   updateTick(s); renderChip(); renderPeek();
+  if (state.ready) map.triggerRepaint();     // the selected lot on the map follows its bar
 }
 
 // The one-line chip that carries the selected lot into Every-lot mode.
@@ -1124,7 +1203,7 @@ function flyToLot(feature) {
 
 function selectLot(feature, fly) {
   state.selected = feature;
-  state.schedule = DEFAULT_SCHEDULE.map(r => ({ ...r }));
+  resetSchedule();
   for (const id of ["selected-casing", "selected"])
     if (map.getLayer(id)) map.setFilter(id, ["==", ["get", "k"], feature.properties.k]);
   if (fly) flyToLot(feature);
