@@ -105,6 +105,15 @@ WHERE THE DATA COMES FROM
   .water-card { margin: 14px 0; padding: 12px; background: color-mix(in srgb, var(--accent) 8%, var(--surface));
     border: 1px solid var(--rule); border-radius: 6px; }
   .water-card .big { font-size: 24px; }
+  .water-headline { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 8px; }
+  .water-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden;
+    background: var(--rule); }
+  .water-bar span { height: 100%; transition: width 0.15s; }
+  .water-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 10px;
+    font-size: 11px; color: var(--ink-2); }
+  .water-key i { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+    margin-right: 4px; vertical-align: -1px; }
+  .water-card p { margin: 0 0 6px; font-size: 13px; }
   .water-formula { margin: 6px 0 10px; padding: 8px 10px;
     border-left: 3px solid var(--accent);
     background: color-mix(in srgb, var(--accent) 5%, var(--surface));
@@ -157,6 +166,7 @@ WHERE THE DATA COMES FROM
          aria-label="Hypothetical impermeable-material percentage on every lot">
   <div class="stops">
     <button data-t="0" style="left:0%">0% hardscape<br>empty lot</button>
+    <button id="soilFullStop" hidden>soil full</button>
     <button id="maximumStop" data-t="75" style="left:100%">75% hardscape<br>bylaw maximum</button>
   </div>
   <div class="rule-status">
@@ -171,8 +181,20 @@ WHERE THE DATA COMES FROM
   </div>
 
   <div class="water-card">
-    <div class="label">Illustrative water held during a 48&nbsp;mm storm</div>
-    <div class="big"><span id="waterHeld">&ndash;</span> m&sup3;</div>
+    <div class="label" id="waterTitle">During a design storm</div>
+    <div class="water-headline"><span class="big" id="waterHeldPct">&ndash;</span>
+      <span>of the rain soaks into the ground</span></div>
+    <div class="water-bar" aria-hidden="true">
+      <span id="barHeld"></span><span id="barSewer"></span><span id="barSurface"></span>
+    </div>
+    <div class="water-key">
+      <span><i id="keyHeld"></i>Soaks in</span>
+      <span><i id="keySewer"></i>Overflows to sewer</span>
+      <span><i id="keySurface"></i>Wets hard surfaces, evaporates</span>
+    </div>
+    <p id="waterSewer">&ndash;</p>
+    <p id="waterLot">&ndash;</p>
+    <p class="label" id="waterThreshold"></p>
     <div class="label" id="waterScope">Environmental estimate; not a bylaw pass/fail test</div>
   </div>
 
@@ -203,6 +225,7 @@ const D_EFF_MM = 75;              // soil holding depth: mm of water the
                                   // permeable ground holds before it sheds.
                                   // Assumes good soil.
 const SOIL_NAME = "good soil";    // how D_EFF_MM is described on the page
+const OLYMPIC_POOL_M3 = 2500;     // one Olympic swimming pool, for scale
 
 // ---- The by-law ------------------------------------------------------------
 const BYLAW_MAX_IMPERMEABLE_RATIO = 0.75;
@@ -232,6 +255,10 @@ const BUILDINGS_MIN_ZOOM = 14;
 
 // ---- Water retained during the design storm --------------------------------
 const P = DESIGN_RAINFALL_MM, C = RUNOFF_COEFF, D = D_EFF_MM;
+// The hardscape share at which the permeable soil is exactly full:
+// P(1 - i) + P·C·i = D(1 - i). Above it, extra runoff goes to the sewer.
+// If D <= P the soil cannot even hold its own rain, so it is full at 0%.
+const SOIL_FULL_SHARE = D > P ? (D - P) / (D - P + P * C) : 0;
 
 // ---- Page text that depends on the configuration ---------------------------
 document.getElementById("subtitle").textContent =
@@ -260,7 +287,10 @@ document.getElementById("waterFormula").innerHTML =
   `Held (m³) = &Sigma; min[(${P} &times; permeable m&sup2;) + ` +
   `(${P} &times; ${Math.round(C * 100)}% &times; impermeable m&sup2;), ` +
   `(${D} &times; permeable m&sup2;)] &divide; 1,000. ` +
-  `P = rainfall (mm); C = hard-surface runoff fraction; D = soil storage (mm).`;
+  `P = rainfall (mm); C = hard-surface runoff fraction; D = soil storage (mm).<br>` +
+  `Overflow to sewer = water reaching the permeable ground minus what it holds. ` +
+  `The remaining ${Math.round((1 - C) * 100)}% of rain on hard surfaces wets them and evaporates. ` +
+  `The percentage is held &divide; all rain falling on the lots (${P} mm &times; total lot area).`;
 
 
 // ---- The map ------------------------------------------------------------------
@@ -546,20 +576,34 @@ let lotA, lotRoofShares, n = 0, totalArea = 0;
 let overBuildingCount = 0, overImpermeableCount = 0;
 let selectedLot = null, popup = null;
 
-function waterHeldM3(areaM2, hardShare) {
+let medianLotA = 0;
+
+// Where one lot's storm goes: soaked in, over to the sewer, or left on hard surfaces.
+function waterBalance(areaM2, hardShare) {
   const hardArea = areaM2 * hardShare;
   const permeableArea = areaM2 - hardArea;
+  const rainM3 = P * areaM2 / 1000;
   // Retention is the stormwater reaching permeable ground, capped by its soil storage.
-  const stormwaterM3 = (P * permeableArea + P * C * hardArea) / 1000;
-  const soilCapacityM3 = D * permeableArea / 1000;
-  return Math.min(stormwaterM3, soilCapacityM3);
+  const reachingM3 = (P * permeableArea + P * C * hardArea) / 1000;
+  const heldM3 = Math.min(reachingM3, D * permeableArea / 1000);
+  return { rainM3, heldM3, sewerM3: reachingM3 - heldM3, surfaceM3: rainM3 - reachingM3 };
 }
 
 function summarise(hardShare) {
-  let heldM3 = 0;
-  for (let i = 0; i < n; i++) heldM3 += waterHeldM3(lotA[i], hardShare);
-  return heldM3;
+  const total = { rainM3: 0, heldM3: 0, sewerM3: 0, surfaceM3: 0 };
+  for (let i = 0; i < n; i++) {
+    const lot = waterBalance(lotA[i], hardShare);
+    for (const k in total) total[k] += lot[k];
+  }
+  return total;
 }
+
+// 717,310 -> "717,300" and 2,781 -> "2,800": the inputs are too rough for more digits.
+const roundNice = x => (x >= 1000 ? Math.round(x / 100) * 100 : Math.round(x)).toLocaleString("en-CA");
+const pools = m3 => {
+  const n = m3 / OLYMPIC_POOL_M3;
+  return n >= 10 ? Math.round(n).toLocaleString("en-CA") : n.toFixed(1);
+};
 
 const int = x => Math.round(x).toLocaleString("en-CA");
 
@@ -594,6 +638,7 @@ function renderPopup() {
   const hardShare = +slider.value / 100;
   const hardArea = area * hardShare;
   const permeableArea = area - hardArea;
+  const water = waterBalance(area, hardShare);
   const content = document.createElement("div");
   const title = document.createElement("strong");
   title.textContent = selectedLot.properties.ad || "R1-1 lot";
@@ -612,7 +657,8 @@ function renderPopup() {
     `Slider scenario: ${slider.value}% impermeable (${hardArea.toFixed(1)} m²), ` +
     `${100 - +slider.value}% permeable (${permeableArea.toFixed(1)} m²)` +
     `${scenarioBelowRoof ? " — below the mapped roof area, so this is only a hypothetical setting." : "."}\n` +
-    `Illustrative water held: ${waterHeldM3(area, hardShare).toFixed(2)} m³`;
+    `In a ${P} mm storm: ${roundNice(water.heldM3 * 1000)} L soaks in, ` +
+    `${roundNice(water.sewerM3 * 1000)} L overflows to the sewer`;
   content.append(details);
   popup.setDOMContent(content);
 }
@@ -623,10 +669,22 @@ slider.max = String(BYLAW_MAX_IMPERMEABLE_RATIO * 100);
 const maximumStop = document.getElementById("maximumStop");
 maximumStop.dataset.t = slider.max;
 maximumStop.innerHTML = `${slider.max}% hardscape<br>bylaw maximum`;
+// Mark where the soil fills up, so the overflow threshold is visible on the slider.
+const soilFullStop = document.getElementById("soilFullStop");
+if (SOIL_FULL_SHARE > 0 && SOIL_FULL_SHARE * 100 < +slider.max) {
+  soilFullStop.hidden = false;
+  soilFullStop.dataset.t = String(Math.floor(SOIL_FULL_SHARE * 100));
+  soilFullStop.style.left = `${SOIL_FULL_SHARE * 100 / +slider.max * 100}%`;
+  soilFullStop.innerHTML = `~${Math.round(SOIL_FULL_SHARE * 100)}%<br>soil full`;
+}
+for (const [id, colour] of [["barHeld", COLOR_PERMEABLE], ["keyHeld", COLOR_PERMEABLE],
+    ["barSewer", COLOR_IMPERMEABLE], ["keySewer", COLOR_IMPERMEABLE],
+    ["barSurface", COLOR_OUT], ["keySurface", COLOR_OUT]])
+  document.getElementById(id).style.background = colour;
 function update() {
   if (n === 0) return;             // lots not loaded yet
   const hardPct = +slider.value;
-  const heldM3 = summarise(hardPct / 100);
+  const water = summarise(hardPct / 100);
   const overImpermeablePct = n > 0 ? (overImpermeableCount / n * 100).toFixed(2) : "0.00";
   document.getElementById("impermeablePct").textContent = `${hardPct}%`;
   document.getElementById("permeablePct").textContent = `${100 - hardPct}%`;
@@ -643,9 +701,30 @@ function update() {
     ["to-string", ["round", ["*", 100, ["/", ["get", "r"], ["get", "A"]]]]],
     "%",
   ]);
-  document.getElementById("waterHeld").textContent = heldM3.toLocaleString("en-CA", {
-    maximumFractionDigits: 1,
-  });
+  const share = k => water.rainM3 > 0 ? water[k] / water.rainM3 * 100 : 0;
+  document.getElementById("waterTitle").textContent =
+    `During a ${P} mm storm, at ${hardPct}% hardscape on every lot`;
+  document.getElementById("waterHeldPct").textContent = `${Math.round(share("heldM3"))}%`;
+  document.getElementById("barHeld").style.width = `${share("heldM3")}%`;
+  document.getElementById("barSewer").style.width = `${share("sewerM3")}%`;
+  document.getElementById("barSurface").style.width = `${share("surfaceM3")}%`;
+  document.getElementById("waterSewer").innerHTML = water.sewerM3 < 1
+    ? `<b>Nothing overflows to the storm sewer.</b>`
+    : `<b>${roundNice(water.sewerM3)} m³ overflows to the storm sewer</b>, ` +
+      `about ${pools(water.sewerM3)} Olympic swimming pools.`;
+  const lot = waterBalance(medianLotA, hardPct / 100);
+  document.getElementById("waterLot").textContent =
+    `A typical (median) ${Math.round(medianLotA)} m² lot ` + (lot.sewerM3 < 0.001
+      ? `soaks up ${roundNice(lot.heldM3 * 1000)} L and sends none to the sewer.`
+      : `sends about ${roundNice(lot.sewerM3 * 1000)} L to the sewer.`);
+  const soilFullPct = Math.round(SOIL_FULL_SHARE * 100);
+  document.getElementById("waterThreshold").textContent = SOIL_FULL_SHARE <= 0
+    ? `With ${D} mm of soil storage the ground cannot even hold the ${P} mm that lands on it.`
+    : hardPct / 100 <= SOIL_FULL_SHARE
+      ? `Below ~${soilFullPct}% hardscape the soil holds everything that reaches it. ` +
+        `Past that it is full, and extra hardscape goes straight to the sewer.`
+      : `Past ~${soilFullPct}% hardscape the soil is full: every extra point of hardscape ` +
+        `goes straight to the sewer.`;
   document.getElementById("waterScope").textContent =
     `Environmental estimate across ${int(n)} ordinary R1-1 lots (${int(totalArea)} m²); not a bylaw pass/fail test`;
   renderPopup();
@@ -680,6 +759,8 @@ map.on("load", async () => {
     if (lotRoofShares[i] > BYLAW_MAX_IMPERMEABLE_RATIO) overImpermeableCount++;
     totalArea += lotA[i];
   });
+  const sortedA = Float64Array.from(lotA).sort();
+  medianLotA = n % 2 ? sortedA[(n - 1) / 2] : (sortedA[n / 2 - 1] + sortedA[n / 2]) / 2;
 
   // Keep the lot features available for edge rendering and click details.
   map.addSource("lots", { type: "geojson", data });

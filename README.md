@@ -51,8 +51,8 @@ The interactive map sets each in-scope lot from 0% impermeable (fully
 permeable) to the R1-1 by-law maximum of 75%. The hypothetical site starts
 empty; each 2015 building footprint appears when the slider reaches its site's
 measured roof share. Zoom in to see the lot's permeable/impermeable split and
-roof-share percentage, or click a lot for its area split and estimated water
-retention during a 48 mm storm. The distinct building-coverage maximum is 50%
+roof-share percentage, or click a lot for its area split and how much of a
+48 mm storm it soaks up or sends to the sewer. The distinct building-coverage maximum is 50%
 under s. 3.2.2.7. The site-wide water estimate uses 75 mm of soil storage and
 85% runoff from impermeable surfaces; it is an illustrative scenario, not a
 measurement of existing conditions or a claim of legal compliance.
@@ -60,6 +60,15 @@ For each site it estimates rainfall on permeable ground plus runoff from
 impermeable ground, caps that amount at permeable soil storage, converts
 millimetres times square metres to cubic metres (divide by 1,000), and sums
 across sites. It assumes impermeable-surface runoff reaches permeable ground.
+Whatever the soil cannot hold is counted as overflow to the storm sewer.
+
+The water card reports this as a share of the storm rather than a bare volume:
+the percentage of rain that soaks in, the overflow in cubic metres and Olympic
+swimming pools (2,500 m³ each), and the litres a median-sized lot (403 m²)
+sends to the sewer. With 75 mm soil and 85% runoff the soil fills at about 40%
+hardscape, marked on the slider. Below that nothing overflows; above it every
+extra point of hardscape goes to the sewer. At the 75% by-law maximum, 39% of
+the storm soaks in and about 717,300 m³ (≈287 pools) overflows citywide.
 
 The map reports the 50% building-coverage check separately, using mapped 2015
 roof footprints and not the slider setting. Dark footprints are at or below
