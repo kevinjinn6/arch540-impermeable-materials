@@ -156,7 +156,7 @@ The map was also tried on a real R1-1 lot the author worked on, against its
 survey and the proposed landscape plan. The address and the drawings are
 withheld for client privacy; the diagram is a schematic redraw.
 
-![Schematic of a real lot: the survey reads 63.5%, PASS; the tool reads 75.1%, FAIL, because its 2015 roofs still include a back building since replaced by a patio](output/real-lot-survey-vs-tool.png)
+![Schematic of a real lot: the survey reads 63.5%, PASS; the tool reads 75.1%, FAIL, because its 2015 roofs still include a back building since replaced by a patio](output/real-lot-survey-vs-tool-v2.png)
 
 | Share of the site | Survey, today's by-law | The tool |
 |---|---:|---:|

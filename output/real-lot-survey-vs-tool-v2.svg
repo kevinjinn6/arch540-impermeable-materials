@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="572" viewBox="0 0 960 572" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>A real R1-1 lot: survey against the tool</title>
+  <desc>Schematic redraw, not to scale. On the survey the lot is 63.5% impermeable and passes. The tool reads 75.1% and fails, because its 2015 roofs still include a back building since replaced by a patio, so that ground is counted twice.</desc>
+  <defs>
+    <pattern id="gone" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#9d9c97"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#3d3d3a" stroke-width="3"/>
+    </pattern>
+    <pattern id="pavers" width="6" height="6" patternUnits="userSpaceOnUse">
+      <rect width="6" height="6" fill="#d94a48"/>
+      <circle cx="3" cy="3" r="1.2" fill="#fcfcfb"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="572" fill="#fcfcfb"/>
+
+  <!-- ===== Plan (schematic) ===== -->
+  <text x="40" y="36" font-size="17" font-weight="600" fill="#1f1f1d">The lot, redrawn</text>
+  <text x="40" y="55" font-size="13" fill="#66655f">schematic, not to scale</text>
+
+  <text x="150" y="80" font-size="12" fill="#66655f" text-anchor="middle" letter-spacing="2">LANE</text>
+  <text x="150" y="504" font-size="12" fill="#66655f" text-anchor="middle" letter-spacing="2">STREET</text>
+
+  <!-- lot -->
+  <rect x="60" y="90" width="180" height="395" fill="#efeeec" stroke="#1f1f1d" stroke-width="1.5"/>
+
+  <!-- paver ribbon driveway at the lane -->
+  <rect x="196" y="92" width="11" height="78" fill="url(#pavers)"/>
+  <rect x="217" y="92" width="11" height="78" fill="url(#pavers)"/>
+  <!-- lower patio -->
+  <rect x="66" y="112" width="92" height="56" fill="#d94a48"/>
+  <text x="112" y="145" font-size="12" fill="#fff" text-anchor="middle">lower patio</text>
+  <!-- patio -->
+  <rect x="80" y="176" width="108" height="100" fill="#d94a48"/>
+  <text x="134" y="231" font-size="13" fill="#fff" text-anchor="middle">patio</text>
+  <!-- side and front walks -->
+  <rect x="223" y="176" width="12" height="300" fill="#d94a48"/>
+  <rect x="140" y="440" width="12" height="44" fill="#d94a48"/>
+  <!-- house -->
+  <rect x="72" y="292" width="146" height="146" fill="#3d3d3a"/>
+  <text x="145" y="370" font-size="14" fill="#fff" text-anchor="middle">house</text>
+
+  <!-- the 2015 back building, now gone -->
+  <rect x="64" y="100" width="172" height="150" fill="none" stroke="#581c87" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <line x1="236" y1="160" x2="262" y2="160" stroke="#581c87" stroke-width="1.5"/>
+  <text x="268" y="150" font-size="13" font-weight="700" fill="#581c87">old back building</text>
+  <text x="268" y="166" font-size="13" fill="#581c87">(2015 air photos),</text>
+  <text x="268" y="182" font-size="13" fill="#581c87">now the patio:</text>
+  <text x="268" y="198" font-size="13" font-weight="700" fill="#581c87">counted twice</text>
+
+  <!-- leader leaves the ribbons above the dashed box -->
+  <line x1="226" y1="93" x2="262" y2="76" stroke="#55544f" stroke-width="1"/>
+  <text x="268" y="76" font-size="13" fill="#1f1f1d">paver ribbons:</text>
+  <text x="268" y="92" font-size="13" fill="#55544f">impermeable</text>
+  <text x="268" y="108" font-size="13" fill="#55544f">since 2023</text>
+
+  <!-- ===== Bars ===== -->
+  <!-- scale: x = 420 + 4.8 * percent -->
+  <line x1="780" y1="78" x2="780" y2="156" stroke="#1f1f1d" stroke-width="1.5"/>
+  <line x1="780" y1="242" x2="780" y2="286" stroke="#1f1f1d" stroke-width="1.5"/>
+  <text x="780" y="70" font-size="13" font-weight="600" fill="#1f1f1d" text-anchor="middle">75% limit</text>
+
+  <!-- survey -->
+  <text x="420" y="104" font-size="16" font-weight="600" fill="#1f1f1d">The survey, today's by-law</text>
+  <text x="900" y="104" font-size="16" font-weight="700" fill="#2f7d4f" text-anchor="end">63.5% · PASS</text>
+  <rect x="420" y="114" width="147.9" height="36" fill="#3d3d3a"/>
+  <rect x="567.9" y="114" width="144" height="36" fill="#d94a48"/>
+  <rect x="711.9" y="114" width="12.7" height="36" fill="url(#pavers)"/>
+  <rect x="724.6" y="114" width="55.4" height="36" fill="#287bc1"/>
+  <rect x="780" y="114" width="120" height="36" fill="#e2e1dc"/>
+  <text x="494" y="137" font-size="14" fill="#fff" text-anchor="middle">30.8%</text>
+  <text x="640" y="137" font-size="14" fill="#fff" text-anchor="middle">30.0%</text>
+  <text x="752.3" y="137" font-size="13" fill="#fff" text-anchor="middle">43 m²</text>
+  <line x1="718.3" y1="150" x2="718.3" y2="158" stroke="#55544f" stroke-width="1"/>
+  <text x="718.3" y="172" font-size="12" fill="#55544f" text-anchor="middle">pavers 2.6%</text>
+  <text x="420" y="194" font-size="13" fill="#55544f">house, deck, porch measured to the walls · 43 m² spare</text>
+
+  <!-- tool -->
+  <text x="420" y="236" font-size="16" font-weight="600" fill="#1f1f1d">The tool, 2015 roofs</text>
+  <text x="900" y="236" font-size="16" font-weight="700" fill="#581c87" text-anchor="end">75.1% · FAIL</text>
+  <rect x="420" y="246" width="139.2" height="36" fill="#3d3d3a"/>
+  <rect x="559.2" y="246" width="65.6" height="36" fill="url(#gone)"/>
+  <rect x="624.8" y="246" width="143.1" height="36" fill="#d94a48"/>
+  <rect x="767.9" y="246" width="12.5" height="36" fill="url(#pavers)"/>
+  <rect x="780.4" y="246" width="119.6" height="36" fill="#e2e1dc"/>
+  <!-- same purple dashes as the box on the plan -->
+  <rect x="559.2" y="246" width="65.6" height="36" fill="none" stroke="#581c87" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <rect x="779" y="242" width="3" height="44" fill="#581c87"/>
+  <text x="489.6" y="269" font-size="14" fill="#fff" text-anchor="middle">29.0%</text>
+  <text x="696.4" y="269" font-size="14" fill="#fff" text-anchor="middle">29.8%</text>
+  <line x1="592" y1="282" x2="592" y2="290" stroke="#581c87" stroke-width="1.5"/>
+  <text x="592" y="305" font-size="13" font-weight="700" fill="#581c87" text-anchor="middle">13.7% old building, counted twice</text>
+  <line x1="774.2" y1="282" x2="774.2" y2="290" stroke="#55544f" stroke-width="1"/>
+  <text x="774.2" y="305" font-size="12" fill="#55544f" text-anchor="middle">pavers 2.6%</text>
+  <text x="420" y="327" font-size="13" fill="#55544f">over by 0.4 m² · without the old building it reads 61.4%</text>
+
+  <!-- legend -->
+  <g font-size="13" fill="#1f1f1d">
+    <rect x="420" y="364" width="15" height="15" fill="#3d3d3a"/>
+    <text x="444" y="376">buildings</text>
+    <rect x="420" y="390" width="15" height="15" fill="url(#gone)" stroke="#581c87" stroke-width="1.5"/>
+    <text x="444" y="402">the old back building, still in the 2015 roofs</text>
+    <rect x="420" y="416" width="15" height="15" fill="#d94a48"/>
+    <text x="444" y="428">patios, walks, stairs, walls</text>
+    <rect x="420" y="442" width="15" height="15" fill="url(#pavers)"/>
+    <text x="444" y="454">permeable pavers (impermeable under By-law 13670, 2023)</text>
+    <rect x="420" y="468" width="15" height="15" fill="#287bc1"/>
+    <text x="444" y="480">room left under 75%</text>
+  </g>
+
+  <text x="40" y="538" font-size="12.5" fill="#66655f">A real R1-1 lot the author worked on. The address and the drawings are withheld for client privacy.</text>
+  <text x="40" y="556" font-size="12.5" fill="#66655f">Shares of the site: the survey and proposed landscape plan, against the map's data for the same lot.</text>
+</svg>
