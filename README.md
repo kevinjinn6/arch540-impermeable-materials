@@ -25,10 +25,10 @@ Strategy climate goals.
 **In a browser.** Open the [live map](https://kevinjinn6.github.io/arch540-impermeable-materials/)
 on a laptop (it works on a phone, but the panel is easier on a wide screen).
 It needs an internet connection and loads about 8 MB of lot data, and the lot
-card fills in once it has loaded, opening on 3528 W 30th Ave.
+card fills in once it has loaded, opening up on 3528 W 30th Ave.
 
 1. **Pick a lot.** Click a lot on the map, or type a civic address in the
-   search box the City's way (`3528 W 30TH AV`; suggestions appear as you
+   search box the City's way (`3528 W 30TH AV` is the default lot, with suggestions that appear as you
    type) and press Enter. The map flies to it and draws a dashed line around
    it. The card leads with the answer: a bar where the whole site is 100%,
    marked at 50% and 75% (dark is roof, red is paving, blue is room left,
@@ -50,13 +50,13 @@ card fills in once it has loaded, opening on 3528 W 30th Ave.
    check it by hand. The schedule starts again for each new lot.
 3. **Try the whole city.** Switch to **Every lot**. The slider sets the same
    impermeable share on every lot at once, from 0% (an empty lot) to 100%.
-   A house appears once its roofs fit within that share; the mark at 75% is
+   A house appears once its roofs fit within that share, and the mark at 75% is
    the by-law maximum, and past it every lot shows a purple stripe for the
    share over the limit. The purple tick on the slider is the selected lot's
    own roof share. *Change ›* goes back to pick another lot.
 4. **See the storm water.** *48 mm storm* in Every lot, and *Storm* in a
    lot's card, show how much of a 48 mm rain day the lots could hold. This
-   comes from the Rain City Strategy, a Council policy, **not the by-law**;
+   comes from the Rain City Strategy, a Council policy, **not the by-law**,
    its assumptions are written beside it.
 5. **Read the rule.** *The by-law, verbatim*, at the foot of the panel,
    quotes s.3.2.2.7, s.3.2.2.8, s.4.2.2 and the Section 2 definitions word
@@ -85,7 +85,7 @@ not permitted"): allow it under **System Settings → Privacy & Security →
 Files and Folders**, then run again.
 
 **Regenerating the data.** The map reads a committed snapshot. To rebuild it
-from City open data (no API key; about 250 MB of downloads, a few minutes):
+from City open data (no API key, and about 250 MB of downloads, a few minutes):
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -102,7 +102,7 @@ python3 map/check_data.py     # the figures below still hold?
 |---|---|---|
 | Zoning and Development By-law No. 3575, **R1-1 District Schedule** (`sources/zoning-by-law-district-schedule-r1-1.pdf`) | June 2026 consolidation, 17 pp. | s.3.2 and s.3.2.2.1 (p.12), **s.3.2.2.7** and **s.3.2.2.8** (p.12), s.2.2.4 (p.5), **s.4.2.2** (p.16) |
 | Zoning and Development By-law No. 3575, **Section 2 Definitions** (`sources/zoning-by-law-section-2.pdf`) | June 2026 consolidation, 50 pp. | **Impermeable Materials** (p.20), **Permeable Materials** (p.31), Deck (p.11), Patio (p.30), Site (p.43) |
-| City of Vancouver open data | property parcel polygons (retrieved 2026-09-21), building footprints 2015 and 2009 (2026-09-25) | site outlines and areas; roof footprints; heights for the Rhino drawing only |
+| City of Vancouver open data | property parcel polygons (retrieved 2026-09-21), building footprints 2015 and 2009 (2026-09-25) | site outlines and areas, roof footprints, heights for the Rhino drawing only |
 | Rain City Strategy (2019) | Council policy, **not a by-law** | the 48 mm daily design standard in the storm card, as context |
 
 Every passage is quoted verbatim, with its page, in
@@ -140,7 +140,7 @@ split as its bar.
 ![The map on 3528 W 30th Ave: the lot card reads PASS, 132.3 m² spare, with the bar marked at 50% and 75% and the example paving schedule; the lot is outlined with a dashed line on the map](output/map-3528-w-30th-ave.png)
 
 The same lot in *Every lot* with the slider at the 75% by-law maximum:
-61,356 of 61,357 houses fit; the purple tick is this lot's roofs at 39.4%.
+61,356 of 61,357 houses fit, and the purple tick is this lot's roofs at 39.4%.
 
 ![Every lot mode at 75%: the citywide map in red and blue, the slider at the by-law maximum, and 61,356 of 61,357 houses fit](output/map-every-lot-75.png)
 
@@ -160,18 +160,18 @@ against the source by hand.
 **What the tool does not do, and where a person must check:**
 
 - **Roofs are 2015 air-photo footprints.** Anything built or demolished since
-  is wrong here. They follow the roof edge; the by-law measures walls, so a
+  is wrong here. They follow the roof edge, and the by-law measures walls, so a
   0.45 m eave allowance is taken off for the by-law test and both figures are
-  shown. Measured to the roof edge 13,581 assessed sites read over 50%;
+  shown. Measured to the roof edge 13,581 assessed sites read over 50%,
   measured to the walls, 769. The air photo cannot tell which is right for
   any one house, so those 769 are marked *check*, not *exceedance*.
 - **Driveways, patios and walks are in no City dataset.** The lot schedule
-  and the slider are hypotheses you set; they are not a survey of existing
+  and the slider are hypotheses you set, they are not a survey of existing
   paving. The page is not a compliance finding.
 - **It checks s.3.2.2.7 and s.3.2.2.8** for uses under s.3.2 (single detached
   house, duplex and others not regulated by s.3.1). A multiplex under s.3.1
   has no impermeable-materials limit. Laneway houses are regulated by
-  Section 11 (s.2.2.4), which is not in this repository; the map counts them
+  Section 11 (s.2.2.4), which is not in this repository, the map counts them
   as buildings.
 - **A site is parcels sharing an address and an edge** (Section 2, Site).
   Sites over 2,000 m², road allowances, parcels under 150 m² and parcels the
@@ -179,12 +179,12 @@ against the source by hand.
   minimum site area of s.3.2.2.1 are assessed but labelled.
 - **Two readings are the author's**, and the page says so where it relies on
   them: the on-grade, no-impermeable-layer condition applied to every listed
-  permeable material; a raised deck (a *Deck* is over 600 mm, Section 2 p.11)
+  permeable material, a raised deck (a *Deck* is over 600 mm, Section 2 p.11)
   counted as wood, so impermeable.
 - **The split drawn inside each lot is a diagram**, a share of the lot's
   depth from the south edge, not where the surfaces are.
 - **The storm card is Rain City Strategy context**, not the by-law. The R1-1
-  schedule sets no retention requirement; 85% runoff and 75 mm of soil
+  schedule sets no retention requirement: 85% runoff and 75 mm of soil
   storage are this page's assumptions.
 - It cannot know what the Director of Planning will accept as permeable.
 
