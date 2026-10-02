@@ -1,0 +1,10 @@
+# The geospatial pipeline (stormwater.py, buildings.py, map/roof_walls.py).
+# Pinned to the versions the published data was made with, 2026-10-02.
+# The web page, map/check_data.py and map/rhino_site.py need none of these.
+geopandas==1.0.1
+shapely==2.0.7
+pandas==2.3.3
+numpy==2.0.2
+pyproj==3.6.1
+pyogrio==0.11.1
+requests==2.32.5

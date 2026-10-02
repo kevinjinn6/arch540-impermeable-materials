@@ -14,6 +14,9 @@ r11_stormwater_summary.csv
 # Python bytecode, created whenever the tool or its tests run
 __pycache__/
 
-# Stage 2 outputs, reproducible from buildings.py (153 MB + 52 MB)
+# Stage 2 intermediate, reproducible from buildings.py (153 MB)
 r11_stage2.geojson
-map/data/
+# map/data/ IS committed: the published page needs it (lots 17 MB, buildings 35 MB, roof-walls 1.3 MB)
+
+# Claude Code launch configuration (local)
+.claude/

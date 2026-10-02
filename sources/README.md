@@ -10,11 +10,17 @@ All documents are City of Vancouver publications unless noted.
 | File / document | Version statement on the document | Authority | Retrieved | From |
 |---|---|---|---|---|
 | `zoning-by-law-district-schedule-r1-1.pdf` | "City of Vancouver June 2026", 17 pp. | By-law (Zoning and Development By-law No. 3575, district schedule) | 2026-09-21 | `bylaws.vancouver.ca/zoning/zoning-by-law-district-schedule-r1-1.pdf` |
-| Section 2 Definitions, Zoning and Development By-law | June 2026 consolidation | By-law | 2026-09-15 | `bylaws.vancouver.ca/zoning/zoning-by-law-section-2.pdf` — **not yet stored in this repo**, quoted second-hand via `week-01/prompt-b-high-context/`. Download before W2 Friday. |
+| `zoning-by-law-section-2.pdf` | "City of Vancouver June 2026", 50 pp. | By-law (Zoning and Development By-law No. 3575, Section 2 Definitions) | 2026-10-01 | `bylaws.vancouver.ca/zoning/zoning-by-law-section-2.pdf`, downloaded in a browser. Until 2026-10-02 the tool cited a November 2025 copy of this document; the wording of the four definitions used is identical in both, two page numbers were not (see `r1-1-impermeable-extract.md`). |
+| `zoning-by-law-13670-2023-amendments.pdf` | By-law No. 13670, "enacted by Council this 26th day of April, 2023", 4 pp. | By-law (amending No. 3575) | 2026-10-02 | `bylaws.vancouver.ca/consolidated/13670.PDF` via the Internet Archive raw-file URL (see retrieval note). s.2(a) adds "permeable pavers" to the definition of Impermeable Materials. |
+| RM-7A Guidelines | "April 2025", 25 pp. | **Guidelines, not a by-law.** Quoted only for the City's stated reason: "since most permeable pavers lose their permeability over time, parking areas with permeable pavers are counted as impermeable surface" (pp.16–17). | 2026-10-02 | `guidelines.vancouver.ca/guidelines-rm-7a.pdf` via the Internet Archive; not stored (2 MB) |
+| Policy Report RTS 00291, "Referral to Public Hearing - RS zoning schedules to limit impervious surface" | 20 March 2000 (Council 4 April 2000) | Council report, **not a by-law**. The origin of the impermeability regulations and of the Permeable Materials wording; pavers not yet named. | 2026-10-02 | `council.vancouver.ca/000516/ph3.htm` via the Internet Archive; not stored |
 | `protection-of-trees-bylaw-9958.pdf` | "Consolidated for convenience only to December 9, 2025"; "amended to include By-law No. 14546 effective January 1, 2026", 35 pp. | By-law | 2026-09-22 | `bylaws.vancouver.ca/9958c.pdf` (see retrieval note below) |
 | Engineering Design Manual | "City of Vancouver Engineering Design Manual \| 2026", 420 pp. Section 9.3 Urban Forest begins p. 365. | Engineering guidance, **not** a by-law | 2026-09-22 | `vancouver.ca/files/cov/engineering-design-manual.pdf` — not stored here (8 MB); see `tree-bylaw-9958-schedule-a.md` sibling note |
 | `2025-vbbl-book-II-insert-pages.pdf` | Vancouver Building By-law 2025, Book II insert pages | By-law | 2026-09-21 | City of Vancouver. Held for the small-site detention pathway; not currently cited in a claim. |
 | `zoning-by-law-8202-2000-superseded.pdf` | By-law No. 8202, passed 30 May 2000, amending By-law No. 3575 | **Superseded. Do not use for a current claim.** | supplied by author | Held only as evidence for the W1 prompt comparison, where it explains where a wrong 60% figure came from. |
+| City of Vancouver open data: property parcel polygons; zoning districts | portal records, "updated weekly" | **Data, not a by-law.** Site outlines and areas (UTM 10N). The parcel polygon is not a legal survey. | 2026-09-21 | `opendata.vancouver.ca`, cached by `stormwater.py` |
+| City of Vancouver open data: building footprints 2015; building footprints 2009 (LiDAR heights) | 2015 orthophoto trace ("outermost exterior outline", roof edge); 2009 LiDAR | **Data, not a by-law.** Roof areas on the map; heights for the Rhino drawing only. A 0.45 m eave allowance is taken off for the by-law test (see the extract §2). | 2026-09-25 | `opendata.vancouver.ca`, cached by `buildings.py` |
+| Rain City Strategy (2019) | Council policy | **Strategy / policy, not a by-law.** Its 48 mm daily design standard is the storm card's context only. | — | `vancouver.ca` |
 
 ## Retrieval note — please read before repeating this
 
@@ -33,8 +39,8 @@ copy can lag the live document. Before either alternative source is promoted fro
 the shortlist into actual use, open the City URL in a browser and confirm the
 consolidation date still matches the table above.
 
-The R1-1 District Schedule was downloaded directly in a browser and is not subject
-to this caveat.
+The R1-1 District Schedule and Section 2 Definitions were downloaded directly in a
+browser and are not subject to this caveat.
 
 ## Authority levels, kept distinct
 
