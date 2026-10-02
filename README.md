@@ -24,7 +24,7 @@ Strategy climate goals.
 
 **In a browser.** Open the [live map](https://kevinjinn6.github.io/arch540-impermeable-materials/)
 on a laptop (it works on a phone, but the panel is easier on a wide screen).
-It needs an internet connection and loads about 8 MB of lot data; the lot
+It needs an internet connection and loads about 8 MB of lot data, and the lot
 card fills in once it has loaded, opening on 3528 W 30th Ave.
 
 1. **Pick a lot.** Click a lot on the map, or type a civic address in the
