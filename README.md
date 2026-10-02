@@ -150,6 +150,36 @@ In Rhino, the **area bar** beside the site is a copy of the site as a bar: the
 same width, the same area, so its depth is 100% of the site. Dark is the roof
 to the walls, grey the eave strip, blue the room left under 75%.
 
+## A real lot: the tool against a survey
+
+The map was also tried on a real R1-1 lot the author worked on, against its
+survey and the proposed landscape plan. The address and the drawings are
+withheld for client privacy; the diagram is a schematic redraw.
+
+![Schematic of a real lot: the survey reads 63.5%, PASS; the tool reads 75.1%, FAIL, because its 2015 roofs still include a back building since replaced by a patio](output/real-lot-survey-vs-tool.png)
+
+| Share of the site | Survey, today's by-law | The tool |
+|---|---:|---:|
+| Buildings | 30.8% (surveyed walls) | 42.7% (2015 roofs to the walls) |
+| Patios, walks, stairs, walls | 30.0% | 29.8% |
+| Permeable-paver ribbon driveway | 2.6% | 2.6% |
+| **Total** | **63.5% · PASS** | **75.1% · FAIL**, by 0.4 m² |
+
+Why they differ:
+
+- **The 2015 roofs are out of date.** The air photos show a back building
+  that has since been replaced by the new patio, so the tool counts that
+  ground twice: once as roof (13.7% of the site) and once as the patio
+  entered in the schedule. Without it the tool reads 61.4%.
+- **Permeable pavers changed sides.** The plan was drawn before By-law 13670
+  (April 2023) added permeable pavers to *Impermeable Materials*, so it left
+  the ribbons out and totalled 60.8%. Both columns above count them, as the
+  by-law does today.
+- What remains (61.4% against 63.5%) is roof edge less a 0.45 m eave against
+  surveyed walls, and the City parcel against the surveyed site area.
+
+The tool is a first screen; the survey decides.
+
 ## Skill and limits
 
 **Skill.** [`skill/SKILL.md`](skill/SKILL.md) is a reusable procedure for
