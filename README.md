@@ -23,34 +23,41 @@ not the number but the definition behind it: under Section 2 of the Zoning and
 Development By-law, **permeable pavers count as impermeable**, and **wood
 decking counts as permeable only if the boards are spaced**, on grade, with
 nothing under them. A designer specifying a paver driveway to improve drainage
-gains nothing against this limit. The map lets you see that: switch the added
-surface from concrete to permeable pavers and nothing changes; switch to gravel
-and the limit is never crossed.
+gains nothing against this limit. The map lets you see that: set a driveway as
+permeable pavers and the lot's bar reads exactly as it would for concrete; a
+dotted mark shows where the lot would sit if the by-law agreed with the name.
 
 ## How to use it
 
 **In a browser.** Open the [live map](https://kevinjinn6.github.io/arch540-impermeable-materials/).
 It needs an internet connection for the basemap and loads about 8 MB
-(compressed) of lot data before the slider wakes up.
+(compressed) of lot data before the lot card fills in.
 
-1. **Read the rule.** The two passages are quoted at the top, with their pages
-   in the June 2026 consolidation. Open *What counts as impermeable?* for the
-   Section 2 definitions, verbatim.
-2. **Pick a lot.** Click one, or type a civic address the City's way
-   (`3528 W 30TH AV`). The card shows the site area from the City parcel, the
-   2015 roof area to the walls, and the room s.3.2.2.8 leaves after the
-   roofs. The bar under the address is the site as 100%, marked at 50% and
-   75%: dark is roof, red is paving, blue is room, purple is over the limit.
-3. **Fill in what else is on the lot.** Three illustrative surfaces are
-   prefilled; change the material (named in the by-law's words) and the
-   square metres. The total is tested against 75%, each surface says which
-   passage it rests on, and the card shows the arithmetic to check by hand.
-4. **Try the city.** Drag *Paving added to every lot* and watch which lots
-   cross 75% (they turn purple). The purple tick on the slider is the selected
-   lot's own room: drag past it and that lot fails. Switch the material:
-   concrete and permeable pavers give the same count; gravel never crosses.
+1. **Pick a lot.** Click one, or start typing a civic address the City's way
+   (`3528 W 30TH AV`; suggestions appear). The card leads with the answer:
+   the bar is the site as 100%, marked at 50% and 75% (dark is roof, red is
+   paving, blue is room, purple is over the limit), then PASS or FAIL with
+   the margin in square metres. Under it: the 2015 roofs to the walls, the
+   50% rule, and the room s.3.2.2.8 leaves after the roofs. Tap any blue
+   reference such as *s.3.2.2.8 · p.12* to read the passage in place.
+2. **Fill in what else is on the lot.** Under *Paving*, three illustrative
+   surfaces are prefilled; change the material (named in the by-law's words)
+   and the square metres. Each row says whether it counts, with the page;
+   the pavers row says *Counts, despite the name*, and a dotted mark on the
+   bar shows where the lot would sit if pavers were permeable. *Check the
+   arithmetic* shows the sum to verify by hand.
+3. **Try the city.** Switch to *Every lot*. The slider sets the same
+   impermeable share on every lot, from an empty lot at 0% to 100%. A house
+   appears once its 2015 roofs fit within that share; the mark at 75% is the
+   by-law maximum, and past it every lot fails by the purple stripe. The
+   purple tick is the selected lot's own roof share.
+4. **Read the rule.** *The by-law, verbatim*, at the foot of the panel, holds
+   s.3.2.2.7, s.3.2.2.8 and s.4.2.2 and the Section 2 definitions word for
+   word with their pages in the June 2026 consolidation, then the
+   assumptions and the sources.
 5. **The storm card is not the by-law.** It is a Rain City Strategy water
-   balance kept as context, with its assumptions written beside it.
+   balance kept as context (behind *48 mm storm* in Every lot, and *Storm*
+   in a lot's card), with its assumptions written beside it.
 
 **Locally.** The page needs a small web server to load its data files:
 

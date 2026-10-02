@@ -20,14 +20,21 @@ WHAT THIS PAGE DOES
   decks. Then a short schedule of what else is on the lot, classified in the
   by-law's words, tested against 75%.
 
-  For THE CITY (the slider): add the same hard landscaping to every lot and
-  watch which lots cross 75%. Switch the material from concrete to permeable
-  pavers and nothing changes, because Section 2 says they are impermeable.
-  Switch to gravel and the limit is never crossed, because gravel is permeable.
+  For THE CITY (the slider): set the same impermeable share on every lot,
+  from an empty lot at 0% to 100%. Each house appears once its 2015 roofs fit
+  within that share; the 75% mark on the track is the by-law maximum, and past
+  it every lot's extra share is drawn as a purple stripe.
 
-  The storm card at the bottom is NOT the by-law. It is a Rain City Strategy
-  water balance (a Council policy), kept as context, with its assumptions
-  written beside it.
+  The storm card is NOT the by-law. It is a Rain City Strategy water balance
+  (a Council policy), kept as context, with its assumptions written beside it.
+
+HOW THE PANEL IS LAID OUT
+  Two modes under one switch: "One lot" (search, the lot's bar, its verdict,
+  its paving schedule) and "Every lot" (the slider and the count). The by-law
+  passages open in place from the small blue references, and all of them,
+  with the notes and sources, sit behind "The by-law, verbatim" at the end.
+  The legend sits on the map. On a phone the panel is a bottom sheet with a
+  one-line "peek" row.
 
 HOW TO OPEN IT
   It needs a small local web server (a browser will not load the data files
@@ -65,174 +72,303 @@ WHERE THE DATA COMES FROM
 <!-- earcut cuts each lot outline into triangles, which is what the graphics card draws. -->
 <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
 <style>
+  /* Colours. Purple means "over the 75% cap" everywhere: on the map, on the lot's bar, on the
+     slider and on the FAIL pill. Red only ever means "impermeable material". The purple is a
+     dark violet on the light theme and a lavender on the dark one, so it differs from red and
+     blue in lightness as well as hue (hue alone is lost on red-blind viewers). */
   :root {
     --surface: #fcfcfb; --ink: #1f1f1d; --ink-2: #55544f; --ink-3: #66655f;
-    --rule: #e2e1dc; --accent: #2a78d6;
-    --permeable: #287bc1; --impermeable: #d94a48; --over: #9333ea; --check: #ffbf00; --check-ink: #b45309; --out: #b9b8b2;
-    --pass: #2f7d4f; --fail: #c0392b;
+    --rule: #e2e1dc; --fill: #efeeec; --accent: #2a78d6;
+    --permeable: #287bc1; --impermeable: #d94a48; --over: #581c87; --check: #ffbf00; --check-ink: #b45309; --out: #b9b8b2;
+    --roof: #3d3d3a;
+    --pass: #2f7d4f; --fail: #581c87; --on-pill: #fff;
+    --row: 44px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --surface: #1a1a19; --ink: #f0efec; --ink-2: #b9b8b2; --ink-3: #9a9992;
-      --rule: #383835; --accent: #3987e5; --check-ink: #ffbf47; --out: #5a5955;
-      --pass: #5fbf85; --fail: #ef7b6d;
+      --rule: #383835; --fill: #262624; --accent: #3987e5; --over: #d8b4fe; --check-ink: #ffbf47; --out: #5a5955;
+      --roof: #6b6a65; --pass: #5fbf85; --fail: #d8b4fe; --on-pill: #1f1f1d;
     }
   }
   :root[data-theme="dark"] {
     --surface: #1a1a19; --ink: #f0efec; --ink-2: #b9b8b2; --ink-3: #9a9992;
-    --rule: #383835; --accent: #3987e5; --check-ink: #ffbf47; --out: #5a5955;
-    --pass: #5fbf85; --fail: #ef7b6d;
+    --rule: #383835; --fill: #262624; --accent: #3987e5; --over: #d8b4fe; --check-ink: #ffbf47; --out: #5a5955;
+    --roof: #6b6a65; --pass: #5fbf85; --fail: #d8b4fe; --on-pill: #1f1f1d;
   }
   html, body { margin: 0; height: 100%; background: var(--surface); color: var(--ink);
-    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    font: 14px/20px system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--accent); }
+  [hidden] { display: none !important; }
   #map { position: absolute; inset: 0; }
-  #panel {
-    position: absolute; top: 12px; left: 12px; width: 372px;
-    max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
-    background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
-    padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,.12);
-  }
-  @media (max-width: 560px) {
-    #panel { top: auto; bottom: 0; left: 0; width: 100%; max-height: 60%; border-radius: 8px 8px 0 0; }
-  }
-  h1 { font-size: 16px; margin: 0 0 2px; }
-  h2 { font-size: 12px; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
-  .sub { color: var(--ink-2); font-size: 12px; margin: 0 0 10px; }
-  .label { color: var(--ink-2); font-size: 12px; }
-  .small { font-size: 11px; color: var(--ink-3); }
-  .rule { padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px; font-size: 12px; margin: 0 0 8px; }
-  .rule b { display: block; }
-  .rule .q { margin: 4px 0 0; }
-  .rule .ref { color: var(--ink-3); }
-  details summary { cursor: pointer; color: var(--accent); font-size: 12px; }
-  details .q { margin: 6px 0; }
-  .lesson { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); font-size: 12px;
-    background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
-  .search { display: flex; gap: 6px; margin: 4px 0 8px; }
-  .search input { flex: 1; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 6px;
-    background: var(--surface); color: var(--ink); font: inherit; }
-  .search button, .btn { padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px;
-    background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
-  .search button:hover, .btn:hover { border-color: var(--ink-3); }
-  #lot { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; font-size: 12px; }
-  #lot .addr { font-size: 14px; font-weight: 600; }
-  #lot .row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
-  #lot .row span:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .verdict { font-weight: 600; }
-  .pass { color: var(--pass); } .fail { color: var(--fail); } .check { color: var(--check); }
-  table.sched { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 12px; }
-  table.sched td { padding: 2px 2px; vertical-align: middle; }
-  table.sched select { width: 100%; font: inherit; font-size: 11px; padding: 3px; border: 1px solid var(--rule);
-    border-radius: 4px; background: var(--surface); color: var(--ink); }
-  table.sched input { width: 56px; font: inherit; font-size: 12px; padding: 3px 4px; border: 1px solid var(--rule);
-    border-radius: 4px; background: var(--surface); color: var(--ink); text-align: right; }
-  table.sched .cls { width: 60px; font-size: 10px; text-align: center; border-radius: 3px; padding: 2px 3px;
-    color: #fff; }
-  .cls.imp { background: var(--impermeable); } .cls.perm { background: var(--permeable); }
-  .readout { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .readout b { font-size: 20px; font-variant-numeric: tabular-nums; }
-  .readout b.over { color: var(--over); }
-  /* The slider: a track coloured blue up to the selected lot's room and purple past it, with a tick there. */
-  .track { position: relative; margin: 10px 0 0; padding-bottom: 18px; }
-  input[type=range] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 6px;
-    margin: 6px 0 0; border-radius: 3px; background: var(--rule); outline: none; cursor: pointer; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
-    background: var(--surface); border: 2px solid var(--ink); box-sizing: border-box; }
-  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%;
-    background: var(--surface); border: 2px solid var(--ink); box-sizing: border-box; }
-  input[type=range]:disabled { cursor: default; opacity: .5; }
-  .tick { position: absolute; top: 0; width: 2px; height: 18px; background: var(--over); transform: translateX(-1px); }
-  .tick span { position: absolute; top: 18px; font-size: 11px; color: var(--over); white-space: nowrap; }
-  .tick.l span { left: 0; } .tick.c span { left: 0; transform: translateX(-50%); } .tick.r span { right: 0; }
-  .stops { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); }
-  /* The lot's area bar: the site as 100%; dark roofs, red paving, purple past 75%, blue room. */
-  .areabar { position: relative; display: flex; height: 14px; border-radius: 3px; background: var(--rule); margin: 8px 0 16px; }
-  .areabar span { height: 100%; }
-  .areabar span:first-child { border-radius: 3px 0 0 3px; }
-  .areabar .mark { position: absolute; top: -3px; width: 1px; height: 20px; background: var(--ink); }
-  .areabar .mark i { position: absolute; top: 19px; left: 0; transform: translateX(-50%); font-style: normal;
-    font-size: 10px; line-height: 1; color: var(--ink-2); white-space: nowrap; }
-  .mat { display: flex; gap: 4px; margin: 8px 0 6px; }
-  .mat button { flex: 1; padding: 6px 4px; border: 1px solid var(--rule); border-radius: 6px;
-    background: var(--surface); color: var(--ink); font: inherit; font-size: 11px; cursor: pointer; line-height: 1.2; }
-  .mat button small { display: block; color: var(--ink-3); font-size: 10px; }
-  .mat button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
-  .mat button[aria-pressed="true"] small { color: #fff; }
-  .count { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 2px; }
-  .count b { font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
-  .count b.over { color: var(--over); }
-  .count b.check { color: var(--check-ink); }
-  .water { margin: 10px 0 0; padding: 10px 12px; border: 1px dashed var(--rule); border-radius: 6px; font-size: 12px; }
-  .water .tag { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--ink-3); border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px; margin-bottom: 4px; }
-  .water-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--rule); margin: 6px 0 4px; }
-  .water-bar span { height: 100%; }
-  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 6px; }
-  .swatch.outline { box-sizing: border-box; background: transparent !important; border: 2px solid var(--check); outline: 1px solid #17212b; }
-  .swatch.cluster { width: 18px; height: 18px; border: 1.5px solid #17212b; border-radius: 50%; background: var(--check);
-    color: #17212b; font-size: 8px; font-weight: 700; line-height: 16px; text-align: center; }
-  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 12px; font-size: 11px; color: var(--ink-2); }
-  .legend div { display: flex; align-items: center; gap: 6px; }
-  .legend .swatch { margin-right: 0; flex: none; }
-  .legend .small { grid-column: 1 / -1; }
-  .notes { margin: 10px 0 0; padding: 0 0 0 14px; font-size: 11px; color: var(--ink-3); }
-  .notes li { margin: 0 0 3px; }
-  footer { margin-top: 12px; font-size: 11px; color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 8px; }
-  footer a, .rule a, .lesson a, .small a { color: var(--accent); }
-  #cityBtn { margin-top: 10px; width: 100%; }
   #loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-2);
     pointer-events: none; text-align: center; padding: 20px; }
+
+  /* ---- The panel: a fixed head (title, mode switch) over a scrolling body ---- */
+  #panel {
+    position: absolute; top: 12px; left: 12px; width: 372px; max-height: calc(100% - 24px);
+    box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.12);
+  }
+  .progress { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--fill); overflow: hidden; }
+  .progress span { display: block; width: 40%; height: 100%; background: var(--accent); animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+  .handle, .peek { display: none; }
+  .head { flex: none; padding: 20px 20px 0; }
+  .body { flex: 1 1 auto; overflow-y: auto; padding: 0 20px 20px; }
+
+  /* Type: four sizes. Display 28, Title 17, Body 14, Caption 12. Nothing smaller. */
+  h1 { font-size: 17px; line-height: 22px; font-weight: 600; margin: 0; }
+  h2 { margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  .sub { font-size: 12px; line-height: 16px; color: var(--ink-2); margin: 2px 0 0; }
+  .caption { font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .display { font-size: 28px; line-height: 32px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  .pass { color: var(--pass); } .fail { color: var(--fail); } .check { color: var(--check-ink); } .over { color: var(--over); }
+  .pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px;
+    font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--on-pill); background: var(--ink-3); white-space: nowrap; }
+  .pill.pass { background: var(--pass); } .pill.fail { background: var(--fail); } .pill.check { background: var(--check-ink); }
+  .pill.out { background: var(--out); color: var(--ink); }
+
+  /* Segmented controls: the mode switch and the material switch */
+  .seg { display: flex; gap: 2px; padding: 2px; background: var(--fill); border-radius: 10px; box-sizing: border-box; }
+  .seg button { flex: 1 1 0; min-width: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2);
+    font: inherit; font-weight: 500; cursor: pointer; padding: 0 4px; }
+  .seg button[aria-selected="true"], .seg button[aria-checked="true"] { background: var(--surface); color: var(--ink);
+    font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #modes { margin-top: 12px; height: 36px; }
+
+  /* The selected lot, carried into Every-lot mode as one line */
+  .chip-row { display: none; justify-content: space-between; align-items: center; gap: 12px; height: var(--row); margin-top: 4px; }
+  #panel[data-mode="city"] .chip-row { display: flex; }
+  .chip-row .dotink { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); flex: none; }
+  .chip-row .txt { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .linkbtn { border: 0; background: transparent; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-align: left; white-space: nowrap; }
+  #panel[data-mode="city"] #modeLot, #panel[data-mode="lot"] #modeCity { display: none; }
+
+  /* Search */
+  .search { display: flex; align-items: center; gap: 8px; height: var(--row); margin-top: 12px; padding: 0 12px; background: var(--fill); border-radius: 10px; box-sizing: border-box; }
+  .search svg { flex: none; color: var(--ink-2); }
+  .search input { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; }
+  .search input::placeholder { color: var(--ink-3); }
+  .search input::-webkit-search-cancel-button, .search input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+  .search button { flex: none; border: 0; background: transparent; padding: 0; width: 24px; height: 24px; display: inline-flex;
+    align-items: center; justify-content: center; cursor: pointer; color: var(--ink-3); }
+  #addrError { margin: 6px 2px 0; }
+  .hair { height: 1px; background: var(--rule); margin: 16px 0; }
+
+  /* The lot card */
+  .lot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .addr { font-size: 17px; line-height: 22px; font-weight: 600; }
+  .areabar { position: relative; display: flex; height: 14px; border-radius: 4px; background: var(--rule); margin: 12px 0 30px; }
+  .areabar span { height: 100%; transition: width 250ms ease-out; }
+  .areabar span:first-child { border-radius: 4px 0 0 4px; }
+  #barRoof { background: var(--roof); } #barRed { background: var(--impermeable); } #barOver { background: var(--over); } #barBlue { background: var(--permeable); }
+  .areabar.out { background: var(--out); margin-bottom: 16px; }
+  .areabar .mark { position: absolute; top: -2px; width: 1px; height: 18px; background: var(--ink); }
+  .areabar .mark i, .areabar .ghost i { position: absolute; top: 18px; left: 0; transform: translateX(-50%); font-style: normal;
+    font-size: 12px; line-height: 16px; color: var(--ink-2); white-space: nowrap; }
+  .areabar .ghost { position: absolute; top: -2px; width: 0; height: 18px; border-left: 1px dashed var(--ink-3); }
+  .areabar .ghost i { top: 34px; color: var(--ink-3); }
+  .areabar.ghosted { margin-bottom: 46px; }
+  .verdict { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+  .facts { display: flex; flex-direction: column; margin-top: 16px; }
+  .fact { padding: 8px 0; }
+  .fact-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 28px; }
+  .fact-row .num { display: inline-flex; align-items: center; gap: 10px; }
+  .total { margin-top: 8px; min-height: 36px; }
+  .sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; }
+  .empty { margin: 0; color: var(--ink-2); }
+  .skel { display: flex; flex-direction: column; gap: 12px; }
+  .skel span { display: block; height: 14px; border-radius: 6px; background: var(--fill); }
+
+  /* Disclosures: a reference chip opens its passage in place; a row opens its contents */
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  .chev { flex: none; width: 16px; height: 16px; color: var(--ink-3); transition: transform .15s; }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  .chevd { flex: none; width: 12px; height: 12px; transition: transform .15s; }
+  details[open] > summary .chevd { transform: rotate(180deg); }
+  .chip { color: var(--accent); display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 16px; white-space: nowrap; }
+  .ref { margin-top: 4px; }
+  .passage { margin: 6px 0 4px 2px; padding-left: 10px; border-left: 2px solid var(--rule); font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .passage .src { color: var(--ink-3); }
+  .rows { display: flex; flex-direction: column; margin-top: 12px; }
+  .row { border-top: 1px solid var(--rule); }
+  .rows > :last-child { border-bottom: 1px solid var(--rule); }
+  .row > summary, .linkrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: var(--row); font: inherit; color: var(--ink); }
+  .row > summary .two { display: flex; flex-direction: column; padding: 6px 0; }
+  .linkrow { width: 100%; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; }
+  .pad { padding: 0 0 12px; }
+  .hand { display: grid; grid-template-columns: auto auto 1fr; gap: 2px 12px; font-size: 12px; line-height: 16px; color: var(--ink-2);
+    font-variant-numeric: tabular-nums; padding: 0 0 12px; }
+  .hand b { text-align: right; color: var(--ink); font-weight: 600; }
+
+  /* The paving schedule: one row per surface */
+  .sched { list-style: none; margin: 8px 0 0; padding: 0; }
+  .srow { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--rule); }
+  .srow:last-child { border-bottom: 1px solid var(--rule); }
+  .srow-top, .srow-bot { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .srow-bot { flex-wrap: wrap; }
+  .amt { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .amt input { width: 64px; height: 36px; border: 0; border-radius: 8px; background: var(--fill); text-align: right; padding: 0 8px;
+    font: inherit; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .amt input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .rm { border: 0; background: transparent; padding: 0; width: 24px; height: 24px; display: inline-flex; align-items: center;
+    justify-content: center; color: var(--ink-3); cursor: pointer; }
+  .sel { display: inline-flex; align-items: center; gap: 2px; flex: 1 1 0; min-width: 0; }   /* basis 0, so it shrinks before the row wraps */
+  .sel select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; padding: 0; font: inherit; color: var(--ink);
+    width: 100%; min-width: 0; cursor: pointer; text-overflow: ellipsis; }
+  .sel .chevd { color: var(--ink-3); }
+  .cls { flex: none; margin-left: auto; }
+  .cls > summary { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .cls[open] { flex: 1 0 100%; display: flex; flex-direction: column; align-items: flex-end; }
+  .cls .why { align-self: stretch; margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--rule); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-sizing: border-box; flex: none; }
+  .dot.imp { background: var(--impermeable); } .dot.perm { border: 2px solid var(--permeable); }
+
+  /* Every lot */
+  .added { display: flex; align-items: baseline; gap: 8px; margin-top: 20px; }
+  .added b { font-size: 17px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .track { position: relative; margin-top: 8px; padding-top: 20px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 4px; margin: 10px 0;
+    border-radius: 2px; background: var(--rule); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--rule); box-shadow: 0 1px 4px rgba(0,0,0,.22); box-sizing: border-box; }
+  input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--rule); box-shadow: 0 1px 4px rgba(0,0,0,.22); box-sizing: border-box; }
+  input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=range]:disabled { cursor: default; opacity: .6; }
+  /* The tick is the selected lot's room: the track is blue up to it and purple past it. Its label sits above the track. */
+  .tick { position: absolute; top: 24px; width: 2px; height: 16px; background: var(--over); transform: translateX(-1px); border-radius: 1px; }
+  .tick span { position: absolute; bottom: 100%; margin-bottom: 6px; font-size: 12px; line-height: 16px; color: var(--over); white-space: nowrap; }
+  .tick.l span { left: 0; } .tick.c span { left: 0; transform: translateX(-50%); } .tick.r span { right: 0; }
+  .stops { position: relative; display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .stops .limit { position: absolute; top: 0; transform: translateX(-50%); color: var(--ink); white-space: nowrap; }
+  /* The by-law maximum on the track: past it, every lot's extra share is a purple stripe. */
+  .limit-mark { position: absolute; top: 26px; width: 2px; height: 12px; background: var(--ink); transform: translateX(-1px); border-radius: 1px; pointer-events: none; }
+  #cityHint { margin: 8px 0 0; }
+  .tag { display: inline-block; font-size: 12px; line-height: 16px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; margin-bottom: 6px; }
+  .water-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--rule); margin: 6px 0 4px; }
+  .water-bar span { height: 100%; }
+
+  /* The by-law, verbatim: every passage, the notes and the sources, behind one row */
+  #bylaw { margin-top: 12px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .sheet { padding: 4px 0 12px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .sheet .rule b { display: block; color: var(--ink); }
+  .sheet .q { margin-top: 4px; }
+  .sheet .q b { color: var(--ink); }
+  .sheet .src { color: var(--ink-3); }
+  .notes { margin: 0; padding-left: 16px; } .notes li { margin-bottom: 4px; }
+  footer { border-top: 1px solid var(--rule); padding-top: 8px; color: var(--ink-3); }
+
+  /* The legend, on the map, next to the colours it explains */
+  .legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 372px; box-sizing: border-box;
+    padding: 8px 12px; background: color-mix(in srgb, var(--surface) 90%, transparent); border: 1px solid var(--rule); border-radius: 10px;
+    font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .legend div { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .swatch.outline { box-sizing: border-box; border: 2px solid var(--check); outline: 1px solid var(--ink); background: transparent !important; }
+  .swatch.picked { box-sizing: border-box; border: 2px dashed var(--ink); background: transparent !important; }
+  .legend .small { flex-basis: 100%; color: var(--ink-3); }
+  .mapbtn { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; border: 1px solid var(--rule); border-radius: 50%;
+    background: var(--surface); color: var(--ink); font: italic 600 17px/1 Georgia, "Times New Roman", serif;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12); cursor: pointer; display: none; }
+  .maplibregl-ctrl button.city-ctrl { font: 600 11px/1 system-ui, -apple-system, sans-serif; color: #333; }
+
+  /* Phone: the panel is a bottom sheet with a one-line peek and a full height */
+  @media (max-width: 560px) {
+    #panel { top: auto; bottom: 0; left: 0; width: 100%; max-height: none; height: 96px; border-radius: 16px 16px 0 0; border-bottom: 0;
+      transition: height .25s ease; }
+    #panel[data-sheet="full"] { height: 90%; }
+    .handle { display: flex; flex: none; justify-content: center; align-items: center; width: 100%; height: 20px; border: 0; background: transparent; padding: 0; cursor: pointer; }
+    .handle span { width: 36px; height: 5px; border-radius: 3px; background: var(--rule); }
+    .peek { display: block; padding: 0 20px; }
+    .peek-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    #panel[data-sheet="full"] .peek { display: none; }
+    #panel[data-sheet="peek"] .head, #panel[data-sheet="peek"] .body { display: none; }
+    .head { padding-top: 4px; }
+    .legend { display: none; left: auto; right: 12px; bottom: 156px; max-width: calc(100% - 24px); }
+    .legend.open { display: flex; }
+    .mapbtn { display: block; bottom: 108px; }
+    #loading { padding-bottom: 120px; }
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="loading">Loading about 62,000 lots&hellip;</div>
+<div id="mapLegend" class="legend" aria-label="Map legend"></div>
+<button id="legendBtn" class="mapbtn" type="button" aria-label="Legend" aria-expanded="false">i</button>
 
-<div id="panel">
-  <h1>Impermeable materials on R1-1 lots</h1>
-  <p class="sub" id="subtitle"></p>
+<div id="panel" data-mode="lot" data-sheet="peek">
+  <div class="progress" id="progress" role="progressbar" aria-label="Loading lots"><span></span></div>
+  <button class="handle" id="handle" type="button" aria-label="Expand the panel"><span></span></button>
+  <div class="peek" id="peek"></div>
 
-  <div class="rule" id="rule50"></div>
-  <div class="rule" id="rule75"></div>
-  <details id="defs">
-    <summary>What counts as impermeable? (Section 2, verbatim)</summary>
-    <div id="defsBody"></div>
-  </details>
-  <div class="lesson" id="lesson"></div>
-
-  <h2>One lot</h2>
-  <div class="search">
-    <input id="addr" type="search" placeholder="3528 W 30TH AV, or click a lot" aria-label="Find a lot by civic address">
-    <button id="addrGo">Find</button>
-  </div>
-  <div id="lot"><span class="label">Loading&hellip;</span></div>
-
-  <h2>Every lot</h2>
-  <div class="readout">
-    <span>Paving added to every lot</span><b id="addedReadout">0 m²</b>
-  </div>
-  <div class="track">
-    <input type="range" id="slider" min="0" max="250" step="5" value="0" disabled
-           aria-label="Square metres of paving added to every lot">
-    <div class="tick c" id="roomTick" hidden><span id="roomTickLabel"></span></div>
-  </div>
-  <div class="stops"><span>0: roofs only</span><span id="sliderMaxStop"></span></div>
-  <div class="mat" id="mat" role="group" aria-label="Material of the added surface"></div>
-  <div id="cityStatus"></div>
-
-  <div class="water" id="water">
-    <span class="tag">Not the by-law</span>
-    <div id="waterTitle" class="label"></div>
-    <div class="water-bar" aria-hidden="true"><span id="barHeld"></span><span id="barSewer"></span><span id="barSurface"></span></div>
-    <div id="waterText"></div>
-    <div class="small" id="waterNote"></div>
+  <div class="head">
+    <h1>Impermeable materials</h1>
+    <p class="sub" id="subtitle"></p>
+    <div class="seg" id="modes" role="tablist" aria-label="Subject">
+      <button type="button" role="tab" id="tabLot" aria-selected="true" aria-controls="modeLot" data-mode="lot">One lot</button>
+      <button type="button" role="tab" id="tabCity" aria-selected="false" aria-controls="modeCity" data-mode="city">Every lot</button>
+    </div>
+    <div class="chip-row" id="lotChip"></div>
   </div>
 
-  <div class="legend" id="legend"></div>
+  <div class="body">
+    <section id="modeLot" role="tabpanel" aria-labelledby="tabLot">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14" stroke-linecap="round"></path></svg>
+        <input id="addr" type="search" list="addrList" placeholder="Search an address" aria-label="Search an address" autocomplete="off" spellcheck="false">
+        <datalist id="addrList"></datalist>
+        <button type="button" id="addrClear" aria-label="Clear the selected lot" hidden><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor"></circle><path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="var(--surface)" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+      </div>
+      <div class="caption" id="addrError" hidden></div>
+      <div class="hair"></div>
+      <div id="lot"></div>
+    </section>
 
-  <button id="cityBtn" class="btn">Zoom out to the whole city</button>
-  <details class="small" style="margin-top:10px"><summary>Assumptions and limits</summary><ul class="notes" id="notes"></ul></details>
-  <footer id="footer"></footer>
+    <section id="modeCity" role="tabpanel" aria-labelledby="tabCity">
+      <div id="cityHero" aria-live="polite"></div>
+      <div class="added"><b id="addedReadout">0%</b><span id="addedMat"></span></div>
+      <div class="track">
+        <div class="tick c" id="roomTick" hidden aria-hidden="true"><span id="roomTickLabel"></span></div>
+        <div class="limit-mark" id="limitMark" aria-hidden="true"></div>
+        <input type="range" id="slider" min="0" max="75" step="1" value="0" disabled
+               aria-label="Impermeable share of every lot, in percent">
+      </div>
+      <div class="stops"><span>0% · empty lot</span><span class="limit" id="limitStop"></span><span>100%</span></div>
+      <p class="caption" id="cityHint"></p>
+      <div class="rows">
+        <details class="row" id="checkRow"><summary><span id="checkSummary"></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary><div class="caption pad" id="checkBody"></div></details>
+        <details class="row" id="water"><summary><span class="two"><span id="waterSummary"></span><span class="caption" id="waterPolicy"></span></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary>
+          <div class="pad">
+            <span class="tag">Not the by-law</span>
+            <div class="caption" id="waterTitle"></div>
+            <div class="water-bar" aria-hidden="true"><span id="barHeld"></span><span id="barSewer"></span><span id="barSurface"></span></div>
+            <div id="waterText"></div>
+            <div class="caption" id="waterNote"></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <details id="bylaw">
+      <summary class="row-summary" style="display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:var(--row)">The by-law, verbatim<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary>
+      <div class="sheet">
+        <div class="rule" id="rule50"></div>
+        <div class="rule" id="rule75"></div>
+        <div id="defsBody"></div>
+        <h2>Assumptions and limits</h2>
+        <ul class="notes" id="notes"></ul>
+        <footer id="footer"></footer>
+      </div>
+    </details>
+  </div>
 </div>
 
 <script>
@@ -276,9 +412,10 @@ const MATERIALS = [
   { id: "mulch",     name: "wood chips or bark mulch",                  counts: false, why: "named in “Permeable Materials” (p.31)" },
   { id: "lawn",      name: "lawn or planting",                          counts: false, why: "ground, not a material; nothing in s.3.2.2.8 counts it" },
 ];
-// The three choices offered for the citywide slider, by id above.
-const SLIDER_MATERIALS = ["concrete", "pavers", "gravel"];
-const SLIDER_MAX_M2 = 250;             // the slider's reach, in m² added per lot
+// The three choices offered for the citywide slider, by id above, and the short names on the switch.
+// The citywide slider: the impermeable share of every lot, 0% (an empty lot)
+// to the by-law maximum of 75%. A lot's house appears once the slider reaches
+// its roof share (to the walls).
 // Typical hard landscaping, used to prefill a lot's schedule. Edit on the page.
 const DEFAULT_SCHEDULE = [
   { label: "Driveway and parking pad", id: "pavers",   m2: 45 },
@@ -308,16 +445,19 @@ const STORM = {
 };
 
 // ---- Colours for the lots (CSS variables above hold the panel's) ------------
-const COLOR = { permeable: "#287bc1", impermeable: "#d94a48", over: "#9333ea", check: "#ffbf00",
-                out: "#b9b8b2", roof: "#3d3d3a", roofDark: "#6b6a65" };
 // blue = permeable, red = impermeable (growing from the south edge of each lot, as a diagram),
-// purple = the lot is over the 75% cap at this setting, amber = roof alone over 50% even to the walls: check
+// purple = the lot is over the 75% cap at this setting, amber = roof alone over 50% even to the walls: check.
+// The purple is a dark violet on the light basemap and a lavender on the dark one, so that it
+// differs from red and from blue in lightness, not only in hue. Keep these equal to --over above.
+const COLOR = { permeable: "#287bc1", impermeable: "#d94a48", over: "#581c87", overDark: "#d8b4fe", check: "#ffbf00",
+                out: "#b9b8b2", roof: "#3d3d3a", roofDark: "#6b6a65" };
 const LOT_OPACITY = 0.82;
 const BUILDINGS_MIN_ZOOM = 14;        // footprints are fetched and drawn from this zoom in
 
 // ---- Where the map opens ---------------------------------------------------------
 const OPEN_ADDRESS = "3528 W 30TH AV";          // the README's example lot; "" for none
 const OPEN_AT = { center: [-123.17805, 49.24300], zoom: 17.2 };   // used when the address is not found
+const FIND_ZOOM = 19;        // search, the opening lot, a check circle and "One lot" fly in to at least this: a lot about 110 px wide, its block around it
 const CITY_BOUNDS = [[-123.2245, 49.1985], [-123.0236, 49.2951]];
 
 const DATA_FILE = "data/lots.geojson";
@@ -386,58 +526,78 @@ function waterBalance(areaM2, hardShare) {
 
 
 // ---- Page text that depends on the configuration ---------------------------
-const B = BYLAW, P50 = PASSAGES.s3227, P75 = PASSAGES.s3228;
-document.getElementById("subtitle").textContent =
-  `R1-1 District Schedule, ${B.consolidation}, with Section 2 · City parcels · 2015 roof footprints`;
-document.getElementById("rule50").innerHTML =
-  `<b>Buildings · ${B.building_limit * 100}% of the site</b><div class="q">“${P50.text}” <span class="ref">${P50.ref}</span></div>`;
-document.getElementById("rule75").innerHTML =
-  `<b>Impermeable materials · ${B.impermeable_limit * 100}% of the site, buildings included</b>` +
-  `<div class="q">“${P75.text}” <span class="ref">${P75.ref}</span></div>` +
-  `<div class="q">“${PASSAGES.s422.text}” <span class="ref">${PASSAGES.s422.ref}</span></div>`;
-document.getElementById("defsBody").innerHTML =
-  `<div class="q"><b>Impermeable Materials</b> “${PASSAGES.imp.text}” <span class="ref">${PASSAGES.imp.ref}</span></div>` +
-  `<div class="q"><b>Permeable Materials</b> “${PASSAGES.perm.text}” <span class="ref">${PASSAGES.perm.ref}</span></div>` +
-  `<div class="q"><b>Site</b> “${PASSAGES.site.text}” <span class="ref">${PASSAGES.site.ref}</span></div>` +
-  `<div class="small">Source: <a href="${B.section2_url}" target="_blank" rel="noopener">Section 2 Definitions</a> and the ` +
+const B = BYLAW, P50 = PASSAGES.s3227, P75 = PASSAGES.s3228, L = B.impermeable_limit;
+const $ = id => document.getElementById(id);
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+const OVER = dark ? COLOR.overDark : COLOR.over;          // the map's purple for this theme
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const pageOf = ref => (ref.match(/p\.\d+/) || [""])[0];                      // "p.20"
+const shortRef = ref => { const t = ref.split(","); return `${t[0].trim()} · ${t[t.length - 1].trim()}`; };  // "s.3.2.2.8 · p.12"
+const urlOf = key => /^s\d/.test(key) ? B.schedule_url : B.section2_url;
+const CHEV = `<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
+const CHEVD = `<svg class="chevd" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
+// A passage, verbatim, with its page and a link to the City's PDF.
+const passage = key => { const p = PASSAGES[key];
+  return `<div class="passage">“${p.text}” <span class="src">${p.ref}</span> · <a href="${urlOf(key)}" target="_blank" rel="noopener">Full text ↗</a></div>`; };
+// A reference chip: tap it and the passage opens under it.
+const chip = label => `<span class="chip">${label} ${CHEVD}</span>`;
+
+$("subtitle").textContent =
+  `Vancouver R1-1 · buildings ≤ ${B.building_limit * 100}% · impermeable ≤ ${L * 100}%, buildings included`;
+$("rule50").innerHTML =
+  `<b>Buildings · ${B.building_limit * 100}% of the site</b><div class="q">“${P50.text}” <span class="src">${P50.ref}</span></div>`;
+$("rule75").innerHTML =
+  `<b>Impermeable materials · ${L * 100}% of the site, buildings included</b>` +
+  `<div class="q">“${P75.text}” <span class="src">${P75.ref}</span></div>` +
+  `<div class="q">“${PASSAGES.s422.text}” <span class="src">${PASSAGES.s422.ref}</span></div>`;
+$("defsBody").innerHTML =
+  `<b style="display:block;color:var(--ink)">What counts, in the by-law's words</b>` +
+  `<div class="q"><b>Impermeable Materials</b> “${PASSAGES.imp.text}” <span class="src">${PASSAGES.imp.ref}</span></div>` +
+  `<div class="q"><b>Permeable Materials</b> “${PASSAGES.perm.text}” <span class="src">${PASSAGES.perm.ref}</span></div>` +
+  `<div class="q"><b>Site</b> “${PASSAGES.site.text}” <span class="src">${PASSAGES.site.ref}</span></div>` +
+  `<div class="q">Source: <a href="${B.section2_url}" target="_blank" rel="noopener">Section 2 Definitions</a> and the ` +
   `<a href="${B.schedule_url}" target="_blank" rel="noopener">R1-1 District Schedule</a>, City of Vancouver, ${B.consolidation}. ` +
   `Copies with these page numbers are in the repository's <code>sources/</code> folder.</div>`;
-document.getElementById("lesson").innerHTML =
-  `<b>Permeable pavers count as impermeable</b> (p.20; added 2023 by By-law 13670: they “lose their permeability over time”). ` +
-  `Decking escapes only with spaced boards on grade. Gravel, mulch and planting do not count.`;
-document.getElementById("sliderMaxStop").textContent = `${SLIDER_MAX_M2} m²`;
-const slider = document.getElementById("slider");
-slider.max = String(SLIDER_MAX_M2);
+const slider = $("slider");
+slider.max = "100";
+{ // the 75% mark, on the same scale as the thumb's centre (see updateTick)
+  const at = `calc(12px + (100% - 24px) * ${BYLAW.impermeable_limit})`;
+  $("limitMark").style.left = at; $("limitStop").style.left = at;
+  $("limitStop").textContent = `${BYLAW.impermeable_limit * 100}% · by-law max`;
+}
 const sw = c => `<span class="swatch" style="background:${c}"></span>`;
-document.getElementById("legend").innerHTML = [
-  [sw(COLOR.permeable), "permeable"],
-  [sw(COLOR.impermeable), "impermeable"],
-  [sw(COLOR.over), `over ${B.impermeable_limit * 100}%`],
-  [sw(COLOR.out), "not assessed"],
-  [`<span class="swatch outline"></span>`, `roof over ${B.building_limit * 100}%: check`],
-  [`<span class="swatch cluster">#</span>`, "check sites, zoomed out"],
+$("mapLegend").innerHTML = [
+  [sw(COLOR.permeable), "Permeable"],
+  [sw(COLOR.impermeable), "Impermeable"],
+  [sw(OVER), `Over ${L * 100}%`],
+  [`<span class="swatch outline"></span>`, `Check: roof over ${B.building_limit * 100}%`],
+  [`<span class="swatch picked"></span>`, "Selected lot"],
+  [sw(COLOR.out), "Not assessed"],
 ].map(([w, t]) => `<div>${w}${t}</div>`).join("") +
-  `<div class="small" id="legendNote">The split in each lot is a diagram, not a plan.</div>`;
-document.getElementById("mat").innerHTML = SLIDER_MATERIALS.map(id =>
-  `<button data-id="${id}" aria-pressed="${id === SLIDER_MATERIALS[0]}">${MAT[id].name}<small>${MAT[id].counts ? "counts" : "does not count"}</small></button>`).join("");
-document.getElementById("notes").innerHTML = [
+  `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
+$("notes").innerHTML = [
   `Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.`,
   `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m² and flagged parcels are grey: not assessed.`,
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
   `Paving is in no City dataset: the schedule and the slider are hypotheses you set. Not a compliance finding; a reviewer measures from a survey.`,
-  `At exactly ${B.impermeable_limit * 100}% a lot passes. Colours use unrounded areas.`,
+  `At exactly ${L * 100}% a lot passes. Colours use unrounded areas.`,
   `Storm card: ${STORM.rainfall_mm} mm is the ${STORM.policy} design standard, not a by-law. Held = min[rain on permeable ground + ${Math.round(STORM.runoff * 100)}% of rain on hard surfaces, ${STORM.soil_mm} mm × permeable area]; the rest overflows.`,
 ].map(n => `<li>${n}</li>`).join("");
-document.getElementById("footer").innerHTML =
+$("footer").innerHTML =
   `<a href="${B.schedule_url}" target="_blank" rel="noopener">R1-1 District Schedule</a> (${B.consolidation}: s.3.2.2.7–8 p.12, s.4.2.2 p.16) · ` +
   `<a href="${B.section2_url}" target="_blank" rel="noopener">Section 2</a> (p.20, p.31, p.43, p.11) · City of Vancouver open data · ` +
   `<a href="${B.repo_url}" target="_blank" rel="noopener">Repository</a>: pipeline, Rhino script, tests, source extract · ${VERSION}`;
+$("waterPolicy").textContent = `${STORM.policy.replace(" (2019), a Council policy", ", a Council policy")} · not the by-law`;
+for (const [id, c] of [["barHeld", COLOR.permeable], ["barSewer", OVER], ["barSurface", COLOR.out]]) $(id).style.background = c;
+const skeleton = () => `<div class="skel" aria-hidden="true"><span style="width:56%;height:20px"></span><span></span><span style="width:44%;height:28px"></span><span style="margin-top:8px"></span><span style="width:84%"></span></div>` +
+  `<p class="caption" style="margin:20px 0 0">Loading 62,000 lots (17 MB)…</p>`;
+$("lot").innerHTML = skeleton();
+$("cityHero").innerHTML = `<div class="skel" aria-hidden="true"><span style="width:30%;height:28px"></span><span style="width:60%"></span></div>`;
 
 
 // ---- The map ------------------------------------------------------------------
-const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-const loading = document.getElementById("loading");
-function fail(msg) { loading.textContent = msg; loading.style.pointerEvents = "auto"; }
+const loading = $("loading");
+function fail(msg) { loading.textContent = msg; loading.style.pointerEvents = "auto"; const pr = $("progress"); if (pr) pr.remove(); }
 if (typeof maplibregl === "undefined" || typeof earcut === "undefined") {
   fail("The map library did not load. The page needs an internet connection for the basemap and the drawing library; the data files are local.");
   throw new Error("maplibre or earcut missing");
@@ -449,6 +609,18 @@ const map = new maplibregl.Map({
 });
 map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+// A "City" button under the zoom buttons: the whole city, without changing mode.
+class CityControl {
+  onAdd() {
+    this.el = document.createElement("div"); this.el.className = "maplibregl-ctrl maplibregl-ctrl-group";
+    const b = document.createElement("button"); b.type = "button"; b.className = "city-ctrl"; b.textContent = "City";
+    b.title = "Zoom out to the whole city"; b.setAttribute("aria-label", "Zoom out to the whole city");
+    b.addEventListener("click", () => map.fitBounds(CITY_BOUNDS, { padding: 20 }));
+    this.el.appendChild(b); return this.el;
+  }
+  onRemove() { this.el.remove(); }
+}
+map.addControl(new CityControl(), "top-right");
 map.on("error", e => {
   const m = e && e.error && e.error.message ? e.error.message : "";
   if (loading.isConnected && /style|tiles|Failed to fetch/i.test(m))
@@ -460,8 +632,9 @@ map.on("error", e => {
 // position within the lot, and two per-lot values the slider does not change:
 //   a_roof   roof share to the walls, 0-1           a_A  site area, m²
 //   a_sc     0 assessed, 1 not assessed (grey)
-// The slider sets u_added (m² added to every lot) and u_counts (1 if the added
-// material is impermeable under Section 2, else 0). The shader does the rest.
+// u_scenario is 1 in Every-lot mode: each lot is then hard up to u_hard (the
+// slider, 0-1), red up to 75% and a purple stripe for the share past 75%. In
+// One-lot mode (0) each lot shows its own roofs, purple if they pass 75%.
 const LOT_SHADER = {
   vertex: `
     precision highp float;
@@ -471,14 +644,16 @@ const LOT_SHADER = {
     void main() { gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0); v_y = a_y; v_sc = a_sc; v_roof = a_roof; v_A = a_A; }`,
   fragment: `
     precision highp float;
-    uniform float u_added, u_counts, u_limit, u_opacity;
+    uniform float u_hard, u_scenario, u_limit, u_opacity;
     uniform vec3 u_permeable, u_impermeable, u_over, u_out;
     varying float v_y, v_sc, v_roof, v_A;
     void main() {
-      float share = min(1.0, v_roof + u_counts * u_added / max(v_A, 1.0));
-      vec3 c = v_sc > 0.5 ? u_out
-             : share > u_limit + 1e-6 ? u_over
-             : (v_y >= 1.0 - share ? u_impermeable : u_permeable);
+      vec3 c;
+      if (v_sc > 0.5) c = u_out;
+      else if (u_scenario > 0.5)
+        c = v_y >= 1.0 - u_limit ? (v_y >= 1.0 - u_hard ? u_impermeable : u_permeable)
+          : (v_y >= 1.0 - u_hard ? u_over : u_permeable);
+      else c = v_roof > u_limit + 1e-6 ? u_over : (v_y >= 1.0 - v_roof ? u_impermeable : u_permeable);
       gl_FragColor = vec4(c * u_opacity, u_opacity);
     }`,
 };
@@ -539,7 +714,7 @@ function lotLayer(mesh) {
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-      for (const u of ["u_matrix", "u_added", "u_counts", "u_limit", "u_opacity", "u_permeable", "u_impermeable", "u_over", "u_out"])
+      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_permeable", "u_impermeable", "u_over", "u_out"])
         loc[u] = gl.getUniformLocation(prog, u);
       vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
       this.bindVAO(vao);
@@ -559,13 +734,13 @@ function lotLayer(mesh) {
       for (let r = 0; r < 4; r++) m[12 + r] += ORIGIN.x * m[r] + ORIGIN.y * m[4 + r];
       gl.useProgram(prog);
       gl.uniformMatrix4fv(loc.u_matrix, false, m);
-      gl.uniform1f(loc.u_added, state.added);
-      gl.uniform1f(loc.u_counts, state.counts ? 1 : 0);
+      gl.uniform1f(loc.u_hard, state.hard);
+      gl.uniform1f(loc.u_scenario, state.mode === "city" ? 1 : 0);
       gl.uniform1f(loc.u_limit, BYLAW.impermeable_limit);
       gl.uniform1f(loc.u_opacity, LOT_OPACITY);
       gl.uniform3fv(loc.u_permeable, hexToRGB(COLOR.permeable));
       gl.uniform3fv(loc.u_impermeable, hexToRGB(COLOR.impermeable));
-      gl.uniform3fv(loc.u_over, hexToRGB(COLOR.over));
+      gl.uniform3fv(loc.u_over, hexToRGB(OVER));
       gl.uniform3fv(loc.u_out, hexToRGB(COLOR.out));
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -576,22 +751,192 @@ function lotLayer(mesh) {
   };
 }
 
+// Roofs: each footprint carries its site's roof share (a_rs, to the walls). In
+// Every-lot mode a roof is hidden until the slider reaches that share. In
+// One-lot mode every roof shows.
+const ROOF_SHADER = {
+  vertex: `
+    attribute vec2 a_pos; attribute float a_rs;
+    uniform mat4 u_matrix;
+    varying float v_rs;
+    void main() { gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0); v_rs = a_rs; }`,
+  fragment: `
+    precision mediump float;
+    uniform float u_hard, u_scenario, u_limit, u_opacity;
+    uniform vec3 u_color;
+    varying float v_rs;
+    void main() {
+      if (u_scenario > 0.5 && v_rs > u_hard + 1e-5) discard;
+      gl_FragColor = vec4(u_color * u_opacity, u_opacity);
+    }`,
+};
+
+// Find the lot each footprint stands in (footprints are clipped to sites), on a
+// grid of lot bounding boxes, and give the footprint that lot's roof share.
+function roofShares(buildings, lots) {
+  const CELL = 0.001, grid = new Map(), key = (i, j) => i * 100000 + j;
+  const ringsOf = g => g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+  for (const f of lots) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const rings of ringsOf(f.geometry)) for (const [x, y] of rings[0]) {
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    f._bb = [x0, y0, x1, y1];
+    for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++)
+      for (let j = Math.floor(y0 / CELL); j <= Math.floor(y1 / CELL); j++) {
+        const k = key(i, j); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(f);
+      }
+  }
+  const inRing = (x, y, r) => {
+    let inside = false;
+    for (let a = 0, b = r.length - 1; a < r.length; b = a++)
+      if ((r[a][1] > y) !== (r[b][1] > y) && x < (r[b][0] - r[a][0]) * (y - r[a][1]) / (r[b][1] - r[a][1]) + r[a][0]) inside = !inside;
+    return inside;
+  };
+  const inLot = (x, y, f) => ringsOf(f.geometry).some(rings => inRing(x, y, rings[0]) && !rings.slice(1).some(h => inRing(x, y, h)));
+  for (const b of buildings) {
+    const ring = ringsOf(b.geometry)[0]?.[0];
+    b._rs = 0;                                    // a roof on no R1-1 lot always shows
+    if (!ring) continue;
+    let x = 0, y = 0; for (const [px, py] of ring) { x += px; y += py; }
+    x /= ring.length; y /= ring.length;
+    for (const f of grid.get(key(Math.floor(x / CELL), Math.floor(y / CELL))) || []) {
+      const [x0, y0, x1, y1] = f._bb;
+      if (x < x0 || x > x1 || y < y0 || y > y1 || !inLot(x, y, f)) continue;
+      // at least 1%, so a shed the eave allowance shrinks to nothing still waits for the slider
+      const p = f.properties; b._rs = p.A > 0 ? Math.min(1, Math.max(p.rw / p.A, 0.01)) : 0; break;
+    }
+  }
+}
+
+function buildRoofMesh(features) {
+  const verts = [], fill = [], lines = [];
+  for (const f of features) {
+    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates]
+                : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+    for (const rings of polys) {
+      const base = verts.length / 3, flat = [], holes = [];
+      rings.forEach((ring, i) => {
+        if (i > 0) holes.push(flat.length / 2);
+        const start = flat.length / 2;
+        for (const [lng, lat] of ring) {
+          const m = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]);
+          flat.push(m.x - ORIGIN.x, m.y - ORIGIN.y);
+        }
+        const end = flat.length / 2;
+        for (let k = start; k < end; k++) lines.push(base + k, base + (k + 1 < end ? k + 1 : start));
+      });
+      for (let i = 0; i < flat.length; i += 2) verts.push(flat[i], flat[i + 1], f._rs);
+      for (const k of earcut(flat, holes)) fill.push(base + k);
+    }
+  }
+  return { verts: new Float32Array(verts), fill: new Uint32Array(fill), lines: new Uint32Array(lines) };
+}
+
+function roofLayer(mesh) {
+  let prog, vao, fillIbo, lineIbo, loc = {}, gl2, vaoExt;
+  const compile = (gl, type, src) => {
+    const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  };
+  return {
+    id: "roofs", type: "custom", renderingMode: "2d",
+    onAdd(map, gl) {
+      gl2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+      if (!gl2) gl.getExtension("OES_element_index_uint");
+      vaoExt = gl2 ? null : gl.getExtension("OES_vertex_array_object");
+      this.bindVAO = v => gl2 ? gl.bindVertexArray(v) : vaoExt.bindVertexArrayOES(v);
+      prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, ROOF_SHADER.vertex));
+      gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, ROOF_SHADER.fragment));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_color"]) loc[u] = gl.getUniformLocation(prog, u);
+      vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
+      this.bindVAO(vao);
+      const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
+      [["a_pos", 2, 0], ["a_rs", 1, 8]].forEach(([name, size, offset]) => {
+        const a = gl.getAttribLocation(prog, name);
+        gl.enableVertexAttribArray(a);
+        gl.vertexAttribPointer(a, size, gl.FLOAT, false, 12, offset);
+      });
+      this.bindVAO(null);
+      fillIbo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fillIbo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.fill, gl.STATIC_DRAW);
+      lineIbo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIbo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.lines, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    },
+    render(gl, matrix) {
+      if (map.getZoom() < BUILDINGS_MIN_ZOOM) return;
+      const m = Array.from(matrix);
+      for (let r = 0; r < 4; r++) m[12 + r] += ORIGIN.x * m[r] + ORIGIN.y * m[4 + r];
+      gl.useProgram(prog);
+      gl.uniformMatrix4fv(loc.u_matrix, false, m);
+      gl.uniform1f(loc.u_hard, state.hard);
+      gl.uniform1f(loc.u_scenario, state.mode === "city" ? 1 : 0);
+      gl.uniform1f(loc.u_limit, BYLAW.impermeable_limit);
+      gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      this.bindVAO(vao);
+      gl.uniform1f(loc.u_opacity, 0.9);
+      gl.uniform3fv(loc.u_color, hexToRGB(dark ? COLOR.roofDark : COLOR.roof));
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fillIbo);
+      gl.drawElements(gl.TRIANGLES, mesh.fill.length, gl.UNSIGNED_INT, 0);
+      if (map.getZoom() >= 16) {
+        gl.uniform1f(loc.u_opacity, 1);
+        gl.uniform3fv(loc.u_color, hexToRGB(dark ? "#1a1a19" : "#fcfcfb"));
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIbo);
+        gl.drawElements(gl.LINES, mesh.lines.length, gl.UNSIGNED_INT, 0);
+      }
+      this.bindVAO(null);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    },
+  };
+}
+
 // ---- State -------------------------------------------------------------------------
-const state = { added: 0, matId: SLIDER_MATERIALS[0], counts: MAT[SLIDER_MATERIALS[0]].counts,
-                lots: [], byKey: new Map(), assessed: [], selected: null, schedule: [], wallsFrom: "" };
+const state = { mode: "lot", hard: 0,
+                lots: [], byKey: new Map(), assessed: [], selected: null, schedule: [], wallsFrom: "",
+                ready: false, lotResult: null, city: null, count50edge: 0, count50wall: 0 };
+const panel = $("panel");
+
+// ---- Modes: one lot, or every lot -----------------------------------------------------
+function setMode(mode, moveCamera = true) {
+  state.mode = mode;
+  panel.dataset.mode = mode;
+  for (const b of document.querySelectorAll("#modes button")) b.setAttribute("aria-selected", String(b.dataset.mode === mode));
+  if (moveCamera && state.ready) {
+    if (mode === "city") map.fitBounds(CITY_BOUNDS, { padding: 20 });
+    else if (state.selected) flyToLot(state.selected);
+  }
+  renderPeek();
+  if (state.ready) map.triggerRepaint();     // the map shows the slider only in Every lot
+}
+document.querySelectorAll("#modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+$("handle").addEventListener("click", () => {
+  const full = panel.dataset.sheet !== "full";
+  panel.dataset.sheet = full ? "full" : "peek";
+  $("handle").setAttribute("aria-label", full ? "Collapse the panel" : "Expand the panel");
+});
+$("legendBtn").addEventListener("click", () => {
+  const open = $("mapLegend").classList.toggle("open");
+  $("legendBtn").setAttribute("aria-expanded", String(open));
+});
 
 // ---- One lot -------------------------------------------------------------------------
 function materialOptions(selectedId) {
   const group = (counts, title) => `<optgroup label="${title}">` + MATERIALS.filter(m => m.counts === counts)
-    .map(m => `<option value="${m.id}" ${m.id === selectedId ? "selected" : ""}>${m.name}</option>`).join("") + "</optgroup>";
-  return group(true, "Counts as impermeable (p.20)") + group(false, "Does not count (p.31)");
+    .map(m => `<option value="${m.id}" ${m.id === selectedId ? "selected" : ""}>${cap(m.name)}</option>`).join("") + "</optgroup>";
+  return group(true, `Counts as impermeable (${pageOf(PASSAGES.imp.ref)})`) + group(false, `Does not count (${pageOf(PASSAGES.perm.ref)})`);
 }
+// What a material's row says beside its dot.
+const clsLabel = m => m.id === "pavers" ? "Counts, despite the name"
+  : m.counts ? `Counts · ${pageOf(PASSAGES.imp.ref)}` : `Doesn't count · ${pageOf(PASSAGES.perm.ref)}`;
 
-function renderLot() {
-  const el = document.getElementById("lot");
-  const lot = state.selected;
-  if (!lot) { el.innerHTML = `<span class="label">Click a lot, or type an address above.</span>`; updateTick(null); return; }
-  const p = lot.properties;
+function lotFlags(p) {
   const flags = [];
   if (p.m) flags.push("merged site: adjoining parcels with one address");
   if (p.f) flags.push("shares an address with a parcel it does not adjoin: check");
@@ -600,110 +945,198 @@ function renderLot() {
   if (p.sc === 2) flags.push("road allowance or other non-lot: outside scope");
   if (p.A < NOT_A_SITE_M2) flags.push(`under ${NOT_A_SITE_M2} m²: not assessed as a site`);
   else if (p.A < BYLAW.min_site_area_m2) flags.push(`below the ${BYLAW.min_site_area_m2} m² minimum site area of s.3.2.2.1: an existing small lot, or part of a larger site`);
-  let html = `<div class="row"><span class="addr">${p.ad || "R1-1 lot (no civic address)"}</span><span>${m2(p.A)} site</span></div>`;
+  return flags;
+}
+function openNotes() { $("bylaw").open = true; $("notes").scrollIntoView({ behavior: "smooth", block: "start" }); }
+
+// The card's structure. Built when a lot is chosen or a surface is added, removed
+// or reclassified. The figures that change while typing are filled by renderLotTotals.
+function renderLot() {
+  const el = $("lot");
+  const lot = state.selected;
+  if (!lot) {
+    el.innerHTML = state.ready ? `<p class="empty">Select a lot on the map, or search an address.</p>` : skeleton();
+    state.lotResult = null; updateTick(null); renderChip(); renderPeek(); return;
+  }
+  const p = lot.properties;
+  const flags = lotFlags(p);
+  let html = `<div class="lot-head"><span class="addr">${p.ad || "R1-1 lot (no civic address)"}</span><span class="caption">${m2(p.A)} site</span></div>`;
   if (!p.assessed) {
-    html += `<div class="small">${flags.join(". ")}.</div>`;
-    el.innerHTML = html; updateTick(null); return;
+    html += `<div class="areabar out" aria-hidden="true"></div>` +
+      `<div class="verdict"><span class="pill out">Not assessed</span></div>` +
+      `<p style="margin:8px 0 0">${cap(flags.join(". "))}.</p>` +
+      `<div class="rows"><button type="button" class="row linkrow" id="whyGrey">Why some lots are grey${CHEV}</button></div>`;
+    el.innerHTML = html;
+    $("whyGrey").addEventListener("click", openNotes);
+    state.lotResult = null; updateTick(null); renderChip(); renderPeek(); return;
   }
   const s = assess(p, 0, false);
-  const t = sumSchedule(state.schedule);
-  const total = Math.min(s.A, s.rw + t.imp);
-  const share = total / s.A, overBy = total - s.cap75;
+  const wallsNote = state.wallsFrom ? `${EAVE_M} m eave off` : "no eave data: roof edge used";
+  const st50 = s.over50wall ? "Over, even to the walls: check the data and the year."
+    : s.over50edge ? "Within by the walls; the roof edge alone reads over." : "Within.";
 
   // The area bar: the site as 100%. Dark = roofs to the walls, red = paving that
   // counts, purple = the part past 75%, blue = room still left under 75%.
-  const W = x => `${Math.max(0, Math.min(100, x * 100)).toFixed(2)}%`;
-  const L = B.impermeable_limit;
-  const redW = Math.max(0, Math.min(share, L) - s.shareWall);
-  const purpleW = Math.max(0, share - Math.max(L, s.shareWall));
-  const blueW = Math.max(0, L - share);
-  html += `<div class="areabar" aria-hidden="true">` +
-    `<span style="width:${W(s.shareWall)};background:${COLOR.roof}"></span>` +
-    `<span style="width:${W(redW)};background:${COLOR.impermeable}"></span>` +
-    `<span style="width:${W(purpleW)};background:${COLOR.over}"></span>` +
-    `<span style="width:${W(blueW)};background:${COLOR.permeable}"></span>` +
+  html += `<div class="areabar" id="areabar" aria-hidden="true">` +
+    `<span id="barRoof"></span><span id="barRed"></span><span id="barOver"></span><span id="barBlue"></span>` +
     `<div class="mark" style="left:${B.building_limit * 100}%"><i>${B.building_limit * 100}%</i></div>` +
-    `<div class="mark" style="left:${L * 100}%"><i>${L * 100}%</i></div></div>`;
+    `<div class="mark" style="left:${L * 100}%"><i>${L * 100}%</i></div>` +
+    `<div class="ghost" id="barGhost" hidden><i>if pavers were permeable</i></div></div>`;
+  // The verdict, then the passage it rests on, one tap away.
+  html += `<div class="verdict" aria-live="polite"><span class="pill" id="pill"></span><b class="display" id="margin"></b></div>` +
+    `<details class="ref"><summary class="caption">${chip(shortRef(P75.ref))} · with the paving below</summary>${passage("s3228")}</details>`;
+  // Three facts: the roofs, the 50% rule, the room.
+  html += `<div class="facts">` +
+    `<div class="fact"><div class="fact-row"><span>Roofs</span><span class="num">${m2(s.rw)} · ${pct(s.shareWall)}</span></div>` +
+    `<div class="caption">2015, to the walls (${wallsNote}) · ${m2(s.r)} to the roof edge</div></div>` +
+    `<details class="fact ref"><summary class="fact-row"><span>Buildings ≤ ${B.building_limit * 100}%</span><span class="num">` +
+    (s.over50wall ? `<span class="pill check">Check</span>` : `<span class="pass">✓ within</span>`) + chip(shortRef(P50.ref)) + `</span></summary>` +
+    passage("s3227") + `<div class="caption" style="margin-top:4px">${B.building_limit * 100}% of ${m2(s.A)} = ${m2(s.cap50)}. ${st50}</div></details>` +
+    `<details class="fact ref"><summary class="fact-row"><span>Room after roofs</span><span class="num"><b>${m2(Math.max(0, s.room))}</b>` +
+    chip(`${P75.ref.split(",")[0]} · ${PASSAGES.s422.ref.split(",")[0]}`) + `</span></summary>` + passage("s3228") + passage("s422") +
+    `<div class="caption" style="margin-top:4px">${L} × ${m2(s.A)} = ${m2(s.cap75)}, buildings included; − ${m2(s.rw)} roofs.</div></details></div>`;
+  if (flags.length) html += `<p class="caption" style="margin:4px 0 0">${cap(flags.join(". "))}.</p>`;
 
-  const wallsNote = state.wallsFrom ? `${EAVE_M} m eave off` : "no eave data: roof edge used";
-  html += `<div class="row"><span>Roofs to the walls <span class="small">(2015; ${wallsNote})</span></span><span>${m2(s.rw)} · ${pct(s.shareWall)}</span></div>`;
-  if (s.over50wall)
-    html += `<div class="row"><span>s.3.2.2.7 buildings ≤ ${B.building_limit * 100}%</span><span class="verdict check">over, even to the walls: check</span></div>`;
-  html += `<div class="row"><span>Room under ${L * 100}% after the roofs</span><span><b>${m2(Math.max(0, s.room))}</b></span></div>`;
-  if (flags.length) html += `<div class="small">${flags.join(". ")}.</div>`;
-
-  // The schedule
-  html += `<div class="label" style="margin-top:8px">Paving on this lot <span class="small">illustrative; edit it</span></div>`;
-  html += `<table class="sched" id="sched">`;
+  // The schedule: one row per surface, classified in the by-law's words.
+  html += `<div class="sec"><h2>Paving</h2><span class="caption">Illustrative. Edit it.</span></div><ul class="sched" id="sched">`;
   state.schedule.forEach((row, i) => {
     const m = MAT[row.id];
-    html += `<tr><td style="width:34%"><div class="small">${row.label}</div><select data-i="${i}" aria-label="${row.label} material">${materialOptions(row.id)}</select></td>` +
-            `<td style="width:64px"><input data-i="${i}" type="number" min="0" step="1" value="${row.m2}" aria-label="${row.label} area in square metres"></td>` +
-            `<td><span class="cls ${m.counts ? "imp" : "perm"}">${m.counts ? "counts" : "no"}</span></td></tr>`;
+    html += `<li class="srow">` +
+      `<div class="srow-top"><label for="m2-${i}">${row.label}</label><span class="amt">` +
+      `<input id="m2-${i}" data-i="${i}" type="number" min="0" step="1" value="${row.m2}" aria-label="${row.label} area in square metres"><span class="caption">m²</span>` +
+      `<button type="button" class="rm" data-i="${i}" aria-label="Remove ${row.label}"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="9" r="7"></circle><path d="M5.5 9h7" stroke-linecap="round"></path></svg></button></span></div>` +
+      `<div class="srow-bot"><span class="sel"><select data-i="${i}" aria-label="${row.label} material">${materialOptions(row.id)}</select>${CHEVD}</span>` +
+      `<details class="cls"><summary class="caption"><span class="dot ${m.counts ? "imp" : "perm"}"></span>${clsLabel(m)}</summary>` +
+      `<div class="caption why">${cap(m.why)}.</div></details></div></li>`;
   });
-  html += `</table><button class="btn" id="addRow" style="font-size:11px;padding:3px 8px">+ add a surface</button>`;
-  html += `<div class="row" style="margin-top:8px"><span>Roofs + paving</span><span><b>${m2(total)} · ${pct(share)}</b></span></div>`;
-  html += `<div class="row"><span>s.3.2.2.8</span><span class="verdict ${overBy > 1e-9 ? "fail" : "pass"}">${overBy > 1e-9 ? `FAIL, over by ${m2(overBy)}` : `PASS, ${m2(-overBy)} spare`}</span></div>`;
-  if (t.pavers > 0) {
-    const ifPerm = (total - t.pavers) / s.A;
-    html += `<div class="small">As permeable, the pavers would read ${pct(ifPerm)}. The by-law counts them (p.20).</div>`;
-  }
-  const st50 = s.over50wall ? "over, even to the walls: check" : s.over50edge ? "within by the walls; the roof edge reads over" : "within";
-  const why = state.schedule.map(r => MAT[r.id]).filter((m, i, a) => a.indexOf(m) === i)
-    .map(m => `<li><b>${m.name}</b>: ${m.why}</li>`).join("");
-  const w = waterBalance(s.A, share);
-  html += `<details class="small" style="margin-top:6px"><summary>Arithmetic, passages, storm, Rhino</summary>` +
-    `<div class="q">Check by hand: ${L} × ${p.A.toFixed(2)} = ${s.cap75.toFixed(2)}; − ${s.rw.toFixed(2)} roofs = ${s.room.toFixed(2)} m² of room; − ${t.imp.toFixed(2)} paving = ${(s.room - t.imp).toFixed(2)}.</div>` +
-    `<div class="q">Roofs to the roof edge ${m2(s.r)} · ${pct(s.shareEdge)}. s.3.2.2.7 buildings ≤ ${B.building_limit * 100}% = ${m2(s.cap50)}: ${st50}. s.3.2.2.8 ≤ ${L * 100}% = ${m2(s.cap75)}, buildings included (s.4.2.2).</div>` +
-    `<ul class="notes" style="margin-top:4px">${why}</ul>` +
-    `<div class="q">Storm context, not the by-law: in ${STORM.rainfall_mm} mm this lot soaks in ${roundNice(w.heldM3 * 1000)} L and sends ${roundNice(w.sewerM3 * 1000)} L to the sewer (${Math.round(STORM.runoff * 100)}% runoff, ${STORM.soil_mm} mm soil).</div>` +
-    `<div class="q">Rhino: set ADDRESSES to “${p.ad}” in map/rhino_site.py and run it.</div></details>`;
+  html += `</ul><button type="button" class="linkbtn" id="addRow" style="display:flex;align-items:center;height:var(--row)">+ Add a surface</button>`;
+  html += `<div class="fact-row total"><span>Roofs + paving</span><span class="num" id="totalOut"></span></div>`;
+  html += `<div class="rows">` +
+    `<details class="row"><summary>Check the arithmetic${CHEV}</summary><div class="hand" id="handCheck"></div></details>` +
+    `<details class="row"><summary><span>Storm <span class="caption">· Council policy, not the by-law</span></span>${CHEV}</summary><div class="caption pad" id="lotStorm"></div></details>` +
+    `<details class="row"><summary>Draw it in Rhino${CHEV}</summary><div class="caption pad">Set ADDRESSES to “${p.ad}” in <code>map/rhino_site.py</code> and run it in Rhino. It draws the site, its 2015 roofs and this bar.</div></details>` +
+    `</div>`;
   el.innerHTML = html;
+
   el.querySelectorAll("select").forEach(sel => sel.addEventListener("change", e => {
     state.schedule[+e.target.dataset.i].id = e.target.value; renderLot();
   }));
-  el.querySelectorAll("input").forEach(inp => inp.addEventListener("input", e => {
+  el.querySelectorAll("input[type=number]").forEach(inp => inp.addEventListener("input", e => {
     state.schedule[+e.target.dataset.i].m2 = Math.max(0, Number(e.target.value) || 0);
-    renderLotTotalsOnly();
+    renderLotTotals();                       // only the figures move; the field keeps focus
   }));
-  const add = document.getElementById("addRow");
-  if (add) add.addEventListener("click", () => { state.schedule.push({ label: "Another surface", id: "concrete", m2: 0 }); renderLot(); });
-  updateTick(s);
+  el.querySelectorAll(".rm").forEach(b => b.addEventListener("click", e => {
+    state.schedule.splice(+e.currentTarget.dataset.i, 1); renderLot();
+  }));
+  $("addRow").addEventListener("click", () => { state.schedule.push({ label: "Another surface", id: "concrete", m2: 0 }); renderLot(); });
+  renderLotTotals();
 }
 
-// The tick on the slider is the selected lot's room: drag past it and that lot
-// is over 75%. The track is blue up to the tick and purple beyond, when the
-// added material counts. The thumb is 16 px wide, so its centre runs from 8 px
-// to width − 8 px, and the tick is placed on the same scale.
-const THUMB_PX = 16;
+// The figures that change while typing: the bar, the verdict, the total, the hand check, the tick.
+function renderLotTotals() {
+  const lot = state.selected;
+  if (!lot || !lot.properties.assessed || !$("barRoof")) { state.lotResult = null; updateTick(null); renderChip(); renderPeek(); return; }
+  const p = lot.properties;
+  const s = assess(p, 0, false);
+  const t = sumSchedule(state.schedule);
+  const total = Math.min(s.A, s.rw + t.imp);
+  const share = total / s.A, overBy = total - s.cap75, over = overBy > 1e-9;
+  const W = x => `${Math.max(0, Math.min(100, x * 100)).toFixed(2)}%`;
+  $("barRoof").style.width = W(s.shareWall);
+  $("barRed").style.width = W(Math.max(0, Math.min(share, L) - s.shareWall));
+  $("barOver").style.width = W(Math.max(0, share - Math.max(L, s.shareWall)));
+  $("barBlue").style.width = W(Math.max(0, L - share));
+  const ghost = $("barGhost");
+  if (t.pavers > 0) { ghost.hidden = false; ghost.style.left = W((total - t.pavers) / s.A); } else ghost.hidden = true;
+  $("areabar").classList.toggle("ghosted", t.pavers > 0);
+  $("pill").className = `pill ${over ? "fail" : "pass"}`; $("pill").textContent = over ? "Fail" : "Pass";
+  $("margin").className = `display ${over ? "fail" : "pass"}`; $("margin").textContent = over ? `${m2(overBy)} over` : `${m2(-overBy)} spare`;
+  $("totalOut").innerHTML = `<b class="${over ? "fail" : ""}">${m2(total)} · ${pct(share)}</b>`;
+  const spare = s.room - t.imp;
+  $("handCheck").innerHTML = [
+    [`${L} × ${p.A.toFixed(2)}`, `= ${s.cap75.toFixed(2)}`, `limit under ${P75.ref.split(",")[0]}`],
+    [`− roofs`, s.rw.toFixed(2), `2015, to the walls`],
+    [`= room`, s.room.toFixed(2), ``],
+    [`− paving`, t.imp.toFixed(2), `the schedule above`],
+    [`= ${spare < -1e-9 ? "over" : "spare"}`, Math.abs(spare).toFixed(2), over ? "FAIL" : "PASS"],
+  ].map(([a, b, c]) => `<span>${a}</span><b>${b}</b><span>${c}</span>`).join("");
+  const w = waterBalance(s.A, share);
+  $("lotStorm").textContent = `In a ${STORM.rainfall_mm} mm storm this lot soaks in ${roundNice(w.heldM3 * 1000)} L and sends ${roundNice(w.sewerM3 * 1000)} L to the storm sewer ` +
+    `(${Math.round(STORM.runoff * 100)}% runoff, ${STORM.soil_mm} mm soil). ${STORM.policy}; R1-1 has no retention rule.`;
+  state.lotResult = { s, t, total, share, overBy, over };
+  updateTick(s); renderChip(); renderPeek();
+}
+
+// The one-line chip that carries the selected lot into Every-lot mode.
+function renderChip() {
+  const el = $("lotChip"), lot = state.selected;
+  if (!lot) { el.innerHTML = `<span class="txt caption">No lot selected</span><button type="button" class="linkbtn" id="chipChange">Choose a lot ›</button>`; }
+  else {
+    const p = lot.properties;
+    const tail = p.assessed ? `· roofs ${pct(p.rw / p.A)}` : `· not assessed`;
+    el.innerHTML = `<span class="dotink"></span><span class="txt">${p.ad || "R1-1 lot (no civic address)"} <span class="caption">${tail}</span></span>` +
+      `<button type="button" class="linkbtn" id="chipChange">Change ›</button>`;
+  }
+  $("chipChange").addEventListener("click", () => setMode("lot"));
+}
+
+// The phone's peek row: the answer in one line while the map stays visible.
+function renderPeek() {
+  const el = $("peek");
+  if (state.mode === "city") {
+    const c = state.city;
+    el.innerHTML = c ? `<div class="peek-row"><span class="addr">${Math.round(state.hard * 100)}% impermeable</span>` +
+      (state.hard > L + 1e-9 ? `<span class="caption over">every lot over ${L * 100}%</span></div>`
+        : `<span class="caption">${int(c.shown)} of ${int(c.houses)} houses fit</span></div>`) : `<span class="caption">Loading…</span>`;
+    return;
+  }
+  const lot = state.selected;
+  if (!lot) { el.innerHTML = `<span class="caption">${state.ready ? "Select a lot on the map, or search an address." : "Loading 62,000 lots…"}</span>`; return; }
+  const p = lot.properties, r = state.lotResult;
+  if (!p.assessed || !r) { el.innerHTML = `<div class="peek-row"><span class="addr">${p.ad || "R1-1 lot"}</span><span class="pill out">Not assessed</span></div>`; return; }
+  el.innerHTML = `<div class="peek-row"><span class="addr">${p.ad}</span><span class="pill ${r.over ? "fail" : "pass"}">${r.over ? "Fail" : "Pass"}</span></div>` +
+    `<div class="caption"><b class="${r.over ? "fail" : "pass"}">${r.over ? `${m2(r.overBy)} over` : `${m2(-r.overBy)} spare`}</b> · room ${int(Math.max(0, r.s.room))} m²</div>`;
+}
+
+// The tick on the slider is the selected lot's roof share: its house appears
+// there. The thumb is 24 px wide, so its centre runs from 12 px to
+// width − 12 px, and the tick is placed on the same scale.
+const THUMB_PX = 24;
 function updateTick(s) {
-  const tick = document.getElementById("roomTick"), label = document.getElementById("roomTickLabel");
+  const tick = $("roomTick"), label = $("roomTickLabel");
   const at = f => `calc(${THUMB_PX / 2}px + (100% - ${THUMB_PX}px) * ${f.toFixed(4)})`;
-  if (!s) { tick.hidden = true; slider.style.background = ""; return; }
-  const f = Math.max(0, Math.min(1, s.room / SLIDER_MAX_M2));
+  if (!s) { tick.hidden = true; return; }
+  const f = Math.max(0, Math.min(1, s.shareWall));
   tick.hidden = false;
   tick.style.left = at(f);
   tick.className = "tick " + (f < 0.22 ? "l" : f > 0.78 ? "r" : "c");
-  label.textContent = s.room <= 0 ? "this lot: no room, roof alone over"
-    : s.room > SLIDER_MAX_M2 ? `this lot's room ${int(s.room)} m², past the end`
-    : `this lot's room ${int(s.room)} m²`;
-  slider.style.background = state.counts
-    ? `linear-gradient(to right, ${COLOR.permeable} 0, ${COLOR.permeable} ${at(f)}, ${COLOR.over} ${at(f)}, ${COLOR.over} 100%)`
-    : COLOR.permeable;
+  label.textContent = `This lot's roofs · ${pct(s.shareWall)}`;
 }
-// Typing an area re-renders the whole card, which would steal focus; so only
-// the totals are refreshed while typing, by re-rendering after a short pause.
-let totalsTimer = null;
-function renderLotTotalsOnly() { clearTimeout(totalsTimer); totalsTimer = setTimeout(renderLot, 600); }
+
+// Fly to a lot at a zoom where it and its block are legible, centred in the
+// part of the map the panel leaves clear: the panel is on the left on a
+// desktop and a sheet along the bottom on a phone.
+function flyToLot(feature) {
+  const rect = panel.getBoundingClientRect();
+  const offset = innerWidth > 560 ? [rect.right / 2, 0] : [0, -rect.height / 2];
+  map.flyTo({ center: featureCenter(feature), zoom: Math.max(map.getZoom(), FIND_ZOOM), offset });
+}
 
 function selectLot(feature, fly) {
   state.selected = feature;
   state.schedule = DEFAULT_SCHEDULE.map(r => ({ ...r }));
-  if (map.getLayer("selected")) map.setFilter("selected", ["==", ["get", "k"], feature.properties.k]);
-  if (fly) {
-    const [x, y] = featureCenter(feature);
-    map.easeTo({ center: [x, y], zoom: Math.max(map.getZoom(), 17) });
-  }
+  for (const id of ["selected-casing", "selected"])
+    if (map.getLayer(id)) map.setFilter(id, ["==", ["get", "k"], feature.properties.k]);
+  if (fly) flyToLot(feature);
+  addr.value = feature.properties.ad || "";
+  addrClear.hidden = false;
+  addrError.hidden = true;
+  renderLot();
+}
+function clearSelection() {
+  state.selected = null;
+  if (map.getLayer("selected")) for (const id of ["selected-casing", "selected"]) if (map.getLayer(id)) map.setFilter(id, ["==", ["get", "k"], ""]);
+  addrClear.hidden = true;
   renderLot();
 }
 
@@ -716,75 +1149,95 @@ function featureCenter(feature) {
   return [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 }
 
+// ---- Address search: suggestions as you type, Enter or a pick to select -----------
+const addr = $("addr"), addrList = $("addrList"), addrClear = $("addrClear"), addrError = $("addrError");
 function findAddress(text) {
   const want = normalise(text);
   if (!want) return null;
-  const exact = state.lots.filter(f => normalise(f.properties.ad) === want);
-  if (exact.length) return exact[0];
-  const starts = state.lots.filter(f => normalise(f.properties.ad).startsWith(want));
-  return starts.length ? starts[0] : null;
+  const exact = state.lots.find(f => f.properties.adn === want);
+  if (exact) return exact;
+  return state.lots.find(f => f.properties.adn.startsWith(want)) || null;
 }
-document.getElementById("addrGo").addEventListener("click", () => {
-  const f = findAddress(document.getElementById("addr").value);
+function suggestAddresses(text) {
+  const want = normalise(text);
+  if (want.length < 3) return [];
+  const out = new Set();
+  for (const f of state.lots) {
+    if (f.properties.adn.startsWith(want)) { out.add(f.properties.ad); if (out.size >= 8) break; }
+  }
+  return [...out];
+}
+function searchGo() {
+  const f = findAddress(addr.value);
   if (f) selectLot(f, true);
-  else document.getElementById("lot").innerHTML = `<span class="label">No R1-1 lot matches “${document.getElementById("addr").value}”. Spell it the City's way: number, street, AV / ST / DR.</span>`;
+  else {
+    addrError.textContent = `No R1-1 lot at “${addr.value}”. Try the City's spelling, like ${OPEN_ADDRESS || "3528 W 30TH AV"}.`;
+    addrError.hidden = false;
+  }
+}
+addr.addEventListener("input", () => {
+  addrError.hidden = true;
+  if (!state.ready) return;
+  const want = normalise(addr.value);
+  const exact = want ? state.lots.find(f => f.properties.adn === want) : null;
+  if (exact) { selectLot(exact, true); return; }           // a suggestion was picked
+  addrList.innerHTML = suggestAddresses(addr.value).map(a => `<option value="${a}"></option>`).join("");
 });
-document.getElementById("addr").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("addrGo").click(); });
+addr.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); searchGo(); } });
+addrClear.addEventListener("click", () => { addr.value = ""; addrList.innerHTML = ""; clearSelection(); addr.focus(); });
 
 // ---- Every lot -----------------------------------------------------------------------
 function cityUpdate() {
   if (!state.assessed.length) return;
   const n = state.assessed.length;
-  let over = 0, overRoofOnly = 0, tooLittleRoom = 0;
+  const hardPct = Math.round(state.hard * 100), atMax = Math.abs(state.hard - L) < 1e-9, past = state.hard > L + 1e-9;
+  let houses = 0, shown = 0, over = 0;
   const totals = { rainM3: 0, heldM3: 0, sewerM3: 0, surfaceM3: 0 };
   for (const p of state.assessed) {
-    const s = assess(p, state.added, state.counts);
-    if (s.over75) over++;
-    if (s.rw > s.cap75 + 1e-9) overRoofOnly++;
-    if (s.room < state.added) tooLittleRoom++;
-    const w = waterBalance(s.A, s.share);
+    const roof = p.rw / p.A;
+    if (p.r > 0) { houses++; if (Math.max(roof, 0.01) <= state.hard + 1e-9) shown++; }   // the same 1% floor as the roofs layer
+    if (roof > L + 1e-9) over++;
+    const w = waterBalance(p.A, state.hard);
     for (const k in totals) totals[k] += w[k];
   }
-  const mat = MAT[state.matId];
-  const readout = document.getElementById("addedReadout");
-  readout.textContent = `${state.added} m²`;
-  const sel = state.selected && state.selected.properties.assessed ? assess(state.selected.properties, 0, false) : null;
-  readout.className = sel && state.counts && state.added > sel.room + 1e-9 ? "over" : "";
-  const pctOver = (over / n * 100).toFixed(1);
-  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-  document.getElementById("cityStatus").innerHTML =
-    `<div class="count"><b class="${over ? "over" : ""}">${int(over)}</b><span>of ${int(n)} lots over ${B.impermeable_limit * 100}% (${pctOver}%)</span></div>` +
-    `<p class="small">${state.added === 0
-      ? `Roofs alone, to the walls. Drag to add paving to every lot.`
-      : mat.counts
-        ? `Lots with under ${state.added} m² of room after their roofs.${mat.id === "pavers" ? " Pavers count the same as concrete (p.20)." : ""}`
-        : `${cap(mat.name)} does not count (p.31). As pavers, ${int(tooLittleRoom)} lots would be over.`}</p>` +
-    `<div class="count"><b class="check">${int(state.count50wall)}</b><span>roofs over ${B.building_limit * 100}% even to the walls: check</span></div>` +
-    `<p class="small">${int(state.count50edge)} to the roof edge; the ${EAVE_M} m eave allowance leaves ${int(state.count50wall)}. The air photo cannot say which is right.</p>`;
+  state.city = { shown, houses, over, n };
+  $("addedReadout").textContent = `${hardPct}%`;
+  $("addedReadout").className = past ? "over" : "";
+  $("addedMat").textContent = `impermeable, ${100 - hardPct}% permeable, on every lot`;
+  $("cityHero").innerHTML = past
+    ? `<span class="display over">${int(n)}</span><span>of ${int(n)} lots over ${L * 100}% <span class="caption">· every lot fails</span></span>`
+    : `<span class="display">${int(shown)}</span>` +
+    `<span>of ${int(houses)} houses fit in ${hardPct}% <span class="caption">· ${(shown / houses * 100).toFixed(1)}%</span></span>`;
+  $("cityHint").innerHTML = hardPct === 0
+    ? `An empty lot: all permeable. Drag right; each house appears when the slider reaches its roof share.`
+    : atMax
+      ? `The by-law maximum: every lot is at its limit and passes.` + (over ? ` ${int(over)} ${over === 1 ? "house doesn't fit: its roofs alone are" : "houses don't fit: their roofs alone are"} over ${L * 100}%.` : "")
+      : past
+        ? `Past the limit: every lot fails by ${hardPct - L * 100}% of its site, the purple stripe.`
+        : `A house shows once its roofs fit within ${hardPct}% of its lot.`;
+  slider.setAttribute("aria-valuetext", `${hardPct} percent impermeable on every lot; ` +
+    (past ? `every lot is over ${L * 100} percent` : `${int(shown)} of ${int(houses)} houses fit`));
+  $("checkSummary").innerHTML = `<b class="check">${int(state.count50wall)}</b> roofs over ${B.building_limit * 100}% <span class="caption">· check</span>`;
+  $("checkBody").textContent = `${int(state.count50edge)} to the roof edge; the ${EAVE_M} m eave allowance leaves ${int(state.count50wall)}. ` +
+    `The air photo cannot say which is right, so these sites are outlined in amber as "check", never "exceedance".`;
   const share = k => totals.rainM3 > 0 ? totals[k] / totals.rainM3 * 100 : 0;
-  document.getElementById("waterTitle").textContent =
-    `${STORM.rainfall_mm} mm storm, every lot as set above`;
-  document.getElementById("barHeld").style.width = `${share("heldM3")}%`;
-  document.getElementById("barSewer").style.width = `${share("sewerM3")}%`;
-  document.getElementById("barSurface").style.width = `${share("surfaceM3")}%`;
-  document.getElementById("waterText").innerHTML =
+  $("waterSummary").innerHTML = `${STORM.rainfall_mm} mm storm <span class="caption">· ${Math.round(share("heldM3"))}% soaks in</span>`;
+  $("waterTitle").textContent = `${STORM.rainfall_mm} mm storm, every lot as set above`;
+  $("barHeld").style.width = `${share("heldM3")}%`;
+  $("barSewer").style.width = `${share("sewerM3")}%`;
+  $("barSurface").style.width = `${share("surfaceM3")}%`;
+  $("waterText").innerHTML =
     `<b>${Math.round(share("heldM3"))}%</b> soaks in · ` +
     (totals.sewerM3 < 1 ? `nothing to the storm sewer`
       : `<b>${roundNice(totals.sewerM3)} m³</b> to the storm sewer, about ${(totals.sewerM3 / STORM.pool_m3).toFixed(0)} Olympic pools`);
-  document.getElementById("waterNote").textContent =
-    `${STORM.policy}; R1-1 has no retention rule. ${Math.round(STORM.runoff * 100)}% runoff and ${STORM.soil_mm} mm soil storage are assumptions.`;
-  renderLot();
+  $("waterNote").textContent =
+    `${STORM.policy}. R1-1 has no retention rule. Assumes ${Math.round(STORM.runoff * 100)}% runoff and ${STORM.soil_mm} mm of soil storage.`;
+  renderLotTotals();
   map.triggerRepaint();
 }
-for (const [id, c] of [["barHeld", COLOR.permeable], ["barSewer", COLOR.over], ["barSurface", COLOR.out]])
-  document.getElementById(id).style.background = c;
-slider.addEventListener("input", () => { state.added = +slider.value; cityUpdate(); });
-document.querySelectorAll("#mat button").forEach(b => b.addEventListener("click", () => {
-  state.matId = b.dataset.id; state.counts = MAT[state.matId].counts;
-  document.querySelectorAll("#mat button").forEach(x => x.setAttribute("aria-pressed", x === b));
-  cityUpdate();
-}));
-document.getElementById("cityBtn").addEventListener("click", () => map.fitBounds(CITY_BOUNDS, { padding: 20 }));
+slider.addEventListener("input", () => { state.hard = +slider.value / 100; cityUpdate(); });
+
+renderPeek();                                       // the phone's peek row says "Loading…" until the data arrives
 
 // ---- Load ------------------------------------------------------------------------------
 map.on("load", async () => {
@@ -808,6 +1261,7 @@ map.on("load", async () => {
     p.rw = hasRw ? Number(p.rw) : walls && walls.rw[p.k] !== undefined ? Number(walls.rw[p.k]) : p.r;
     p.rw = Math.min(p.rw, p.r);
     p.assessed = p.sc === 0 && !p.cd && !p.f && p.A >= NOT_A_SITE_M2 ? 1 : 0;
+    p.adn = normalise(p.ad);                 // for the address search
   }
   state.lots = data.features;
   state.byKey = new Map(data.features.map(f => [f.properties.k, f]));
@@ -823,6 +1277,12 @@ map.on("load", async () => {
   map.addLayer({ id: "lot-hit-area", type: "fill", source: "lots", paint: { "fill-color": "#000", "fill-opacity": 0.02 } }, firstLabel);
   map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
     paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.3, 18, 1.5] } }, firstLabel);
+  // The lot you picked: a wide casing in the page's surface colour, drawn
+  // under the amber check ring so a lot that is both still shows both; its
+  // dashed ink line is added after the check layers, below.
+  map.addLayer({ id: "selected-casing", type: "line", source: "lots", filter: ["==", ["get", "k"], ""],
+    layout: { "line-join": "round" },
+    paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb", "line-width": 9, "line-opacity": 0.95 } }, firstLabel);
   // Roofs over 50% even to the walls: an amber outline, "check".
   const checkFilter = ["all", ["==", ["get", "assessed"], 1], [">", ["get", "rw"], ["*", BYLAW.building_limit, ["get", "A"]]]];
   for (const [id, color, width] of [
@@ -851,9 +1311,10 @@ map.on("load", async () => {
     map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
   }
+  // The dashed ink line of the lot you picked; its casing sits under the check ring, above.
   map.addLayer({ id: "selected", type: "line", source: "lots", filter: ["==", ["get", "k"], ""],
     layout: { "line-join": "round" },
-    paint: { "line-color": dark ? "#f0efec" : "#1f1f1d", "line-width": 3 } }, firstLabel);
+    paint: { "line-color": dark ? "#f0efec" : "#1f1f1d", "line-width": 3, "line-dasharray": [2, 1.5] } }, firstLabel);
   map.addLayer({ id: "labels", type: "symbol", source: "lots", minzoom: 17.5,
     filter: ["==", ["get", "assessed"], 1],
     layout: {
@@ -876,6 +1337,8 @@ map.on("load", async () => {
   map.on("mouseleave", "lot-hit-area", () => { map.getCanvas().style.cursor = ""; });
 
   loading.remove();
+  const pr = $("progress"); if (pr) pr.remove();
+  state.ready = true;
   slider.disabled = false;
   const opening = OPEN_ADDRESS ? findAddress(OPEN_ADDRESS) : null;
   if (opening) selectLot(opening, true); else renderLot();
@@ -883,22 +1346,21 @@ map.on("load", async () => {
 
   // Footprints: fetched the first time the map is close enough to show them.
   let footprintsRequested = false;
+  const roofsNote = $("roofsNote");
   const loadFootprints = async () => {
     if (footprintsRequested || map.getZoom() < BUILDINGS_MIN_ZOOM) return;
     footprintsRequested = true;
+    roofsNote.textContent = " · Roofs…"; roofsNote.hidden = false;
     try {
       const res = await fetch(BUILDINGS_FILE);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const buildings = await res.json();
-      for (const f of buildings.features) f.properties = {};        // the page reads nothing from them
-      map.addSource("roofs", { type: "geojson", data: buildings });
-      map.addLayer({ id: "roofs", type: "fill", source: "roofs", minzoom: BUILDINGS_MIN_ZOOM,
-        paint: { "fill-color": dark ? COLOR.roofDark : COLOR.roof, "fill-opacity": 0.9 } }, "selected");
-      map.addLayer({ id: "roof-edges", type: "line", source: "roofs", minzoom: 16,
-        paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb", "line-width": 0.6 } }, "selected");
+      roofShares(buildings.features, state.lots);
+      map.addLayer(roofLayer(buildRoofMesh(buildings.features)), "selected-casing");
+      roofsNote.hidden = true;
     } catch (e) {
       console.warn(`Could not load ${BUILDINGS_FILE}; roofs are not drawn.`, e);
-      document.getElementById("legendNote").textContent += " Roof outlines could not be loaded; the numbers still include them.";
+      roofsNote.textContent = " · Roof outlines not available; the numbers still include them.";
     }
   };
   map.on("zoomend", loadFootprints);
