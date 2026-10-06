@@ -60,6 +60,16 @@ WHERE THE DATA COMES FROM
   data/roof-walls.json     otherwise, rw per site: the same footprints shrunk
                            inwards by the eave allowance before clipping.
   data/buildings.geojson   the 2015 footprints, drawn at street zoom.
+  data/parks.geojson       City park outlines ("Parks - polygon
+                           representation", open data, 2026-09-28), drawn
+                           green under the lots: n name, c class, ha area.
+                           Urban plazas (paved) are left out.
+  data/gardens.geojson     community gardens ("Community gardens and food
+                           trees", 2026-07-14): n name, pl plots. Sites with
+                           food trees only are left out.
+  data/catch-basins.geojson  the City's street catch basins ("Sewer catch
+                           basins", 2026-10-05; locations approximate), one
+                           MultiPoint, drawn from street zoom in.
 ================================================================================
 -->
 <html lang="en">
@@ -304,6 +314,8 @@ WHERE THE DATA COMES FROM
   .legend div { display: flex; align-items: center; gap: 6px; }
   .swatch { width: 12px; height: 12px; border-radius: 4px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .swatch.outline { box-sizing: border-box; border: 2px solid var(--check); outline: 1px solid var(--ink); background: transparent !important; }
+  .swatch.dot { border-radius: 50%; }
+  .swatch.small-dot { width: 6px; height: 6px; margin: 3px; box-shadow: none; }
   .swatch.picked { box-sizing: border-box; border: 2px dashed var(--ink); background: transparent !important; }
   .legend .small { flex-basis: 100%; color: var(--ink-3); }
   .mapbtn { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%;
@@ -491,7 +503,9 @@ const STORM = {
 // The purple is a dark violet on the light basemap and a lavender on the dark one, so that it
 // differs from red and from blue in lightness, not only in hue. Keep these equal to --over above.
 const COLOR = { permeable: "#287bc1", impermeable: "#d94a48", over: "#581c87", overDark: "#d8b4fe", check: "#ffbf00",
-                out: "#b9b8b2", roof: "#3d3d3a", roofDark: "#6b6a65" };
+                out: "#b9b8b2", roof: "#3d3d3a", roofDark: "#6b6a65", park: "#3f9a4a", parkDark: "#4f9a5a",
+                garden: "#c3e88d", gardenEdge: "#1d4d24", basin: "#17212b", basinDark: "#e8eef5" };
+const BASINS_MIN_ZOOM = 15;           // catch basins are drawn from this zoom in
 const LOT_OPACITY = 0.82;
 const BUILDINGS_MIN_ZOOM = 14;        // footprints are fetched and drawn from this zoom in
 
@@ -504,6 +518,9 @@ const CITY_BOUNDS = [[-123.2245, 49.1985], [-123.0236, 49.2951]];
 const DATA_FILE = "data/lots.geojson";
 const WALLS_FILE = "data/roof-walls.json";
 const BUILDINGS_FILE = "data/buildings.geojson";
+const PARKS_FILE = "data/parks.geojson";
+const GARDENS_FILE = "data/gardens.geojson";
+const BASINS_FILE = "data/catch-basins.geojson";
 const VERSION = "2026-10-02";
 // =============================================================================
 //  END OF CONFIGURATION
@@ -614,6 +631,9 @@ $("mapLegend").innerHTML = [
   [`<span class="swatch outline"></span>`, `Check: roof over ${B.building_limit * 100}%`],
   [`<span class="swatch picked"></span>`, "Selected lot"],
   [sw(COLOR.out), "Not assessed"],
+  [sw(COLOR.park), "Park"],
+  [`<span class="swatch dot" style="background:${COLOR.garden};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Community garden"],
+  [`<span class="swatch dot small-dot" style="background:${dark ? COLOR.basinDark : COLOR.basin}"></span>`, "Catch basin"],
 ].map(([w, t]) => `<div>${w}${t}</div>`).join("") +
   `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
 $("notes").innerHTML = [
@@ -1385,6 +1405,31 @@ map.on("load", async () => {
   map.addLayer({ id: "lot-hit-area", type: "fill", source: "lots", paint: { "fill-color": "#000", "fill-opacity": 0.02 } }, firstLabel);
   map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
     paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.3, 18, 1.5] } }, firstLabel);
+  // Parks, green: where the water could go. Drawn over the lots because many
+  // park parcels are in the lot data (large sites in grey, some zoned R1-1);
+  // the check rings and the selection stay on top. MapLibre fetches the file
+  // itself; if it is missing the map simply has no parks.
+  map.addSource("parks", { type: "geojson", data: PARKS_FILE });
+  map.addLayer({ id: "parks", type: "fill", source: "parks",
+    paint: { "fill-color": dark ? COLOR.parkDark : COLOR.park, "fill-opacity": dark ? 0.7 : 0.8 } }, firstLabel);
+  map.addLayer({ id: "park-labels", type: "symbol", source: "parks", minzoom: 14,
+    layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Bold"], "text-size": 12, "symbol-placement": "point" },
+    paint: { "text-color": dark ? "#cfe8cf" : "#1d4d24", "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
+  // Catch basins: where the street's water goes today, a small dot each.
+  map.addSource("basins", { type: "geojson", data: BASINS_FILE });
+  map.addLayer({ id: "basins", type: "circle", source: "basins", minzoom: BASINS_MIN_ZOOM,
+    paint: { "circle-color": dark ? COLOR.basinDark : COLOR.basin,
+             "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 1.5, 19, 4],
+             "circle-stroke-color": dark ? "#1a1a19" : "#fcfcfb", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 15, 0.5, 19, 1.5] } }, firstLabel);
+  // Community gardens: a light green dot with a dark green ring, over the parks.
+  map.addSource("gardens", { type: "geojson", data: GARDENS_FILE });
+  map.addLayer({ id: "gardens", type: "circle", source: "gardens", minzoom: 11,
+    paint: { "circle-color": COLOR.garden, "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 3, 15, 5, 18, 8],
+             "circle-stroke-color": COLOR.gardenEdge, "circle-stroke-width": 1.5 } }, firstLabel);
+  map.addLayer({ id: "garden-labels", type: "symbol", source: "gardens", minzoom: 16,
+    layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Regular"], "text-size": 11,
+              "text-anchor": "top", "text-offset": [0, 0.9], "text-max-width": 10 },
+    paint: { "text-color": dark ? "#cfe8cf" : "#1d4d24", "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
   // The lot you picked: a wide casing in the page's surface colour, drawn
   // under the amber check ring so a lot that is both still shows both; its
   // dashed ink line is added after the check layers, below.
