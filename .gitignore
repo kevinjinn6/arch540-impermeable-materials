@@ -20,3 +20,7 @@ r11_stage2.geojson
 
 # Claude Code launch configuration (local)
 .claude/
+
+# The City's 2013 DEM (1.9 GB, over GitHub's 100 MB limit). map/terrain_tiles.py
+# turns it into map/data/terrain/ (committed, about 15 MB).
+DEM_2013.tif

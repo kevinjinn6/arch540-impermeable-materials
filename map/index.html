@@ -36,6 +36,12 @@ HOW THE PANEL IS LAID OUT
   The legend sits on the map. On a phone the panel is a bottom sheet with a
   one-line "peek" row.
 
+  The "3D" button under "City" tilts the same map into 3D: the ground at true
+  scale (2013 DEM), the lots on it in the same colours, and the 2015 buildings
+  standing at their heights. Every control works the same in both views; in
+  Every-lot mode a building rises once its roofs fit within the slider's
+  share, as its roof appears in 2D. "2D" lays the map flat again.
+
 HOW TO OPEN IT
   It needs a small local web server (a browser will not load the data files
   from disk). In a terminal, from the project folder:
@@ -70,6 +76,14 @@ WHERE THE DATA COMES FROM
   data/catch-basins.geojson  the City's street catch basins ("Sewer catch
                            basins", 2026-10-05; locations approximate), one
                            MultiPoint, drawn from street zoom in.
+  data/terrain/{z}/{x}/{y}.png  ground heights for the shaded relief, from
+                           the City's 2013 bare-earth DEM (map/terrain_tiles.py;
+                           heights x5 so slopes show, about 3 m per pixel). Picture only:
+                           no figure on the page uses them. The 3D view uses
+                           the same tiles as its ground, divided back to true
+                           scale.
+  data/lot-ground.bin      the ground height under every lot corner, for the 3D
+                           view (map/lot_ground.py; 0.1 m steps).
 ================================================================================
 -->
 <html lang="en">
@@ -514,6 +528,11 @@ const OPEN_ADDRESS = "3528 W 30TH AV";          // the README's example lot; "" 
 const OPEN_AT = { center: [-123.17805, 49.24300], zoom: 17.2 };   // used when the address is not found
 const FIND_ZOOM = 19;        // search, the opening lot, a check circle and "One lot" fly in to at least this: a lot about 110 px wide, its block around it
 const CITY_BOUNDS = [[-123.2245, 49.1985], [-123.0236, 49.2951]];
+// The 3D view (the "3D" button): true-scale ground from the same terrain tiles, lots lifted
+// onto it by lot-ground.bin, buildings at their heights (buildings.geojson h: 2009 LiDAR, or
+// the 3 m / 8.5 m placeholders, drawn lighter).
+const VIEW_3D = { pitch: 60, lot_ground: "data/lot-ground.bin", tile_exaggeration: 5,
+                  assumed: "#a8a59d", assumedDark: "#4d4b47" };
 
 const DATA_FILE = "data/lots.geojson";
 const WALLS_FILE = "data/roof-walls.json";
@@ -521,6 +540,18 @@ const BUILDINGS_FILE = "data/buildings.geojson";
 const PARKS_FILE = "data/parks.geojson";
 const GARDENS_FILE = "data/gardens.geojson";
 const BASINS_FILE = "data/catch-basins.geojson";
+// The shaded relief: ground heights from the 2013 DEM, lit from the northwest (the cartographic
+// convention). Strength 0 = no relief, 1 = MapLibre's strongest. The shadow and highlight
+// colours are see-through, so the lot colours still read through the relief.
+const TERRAIN_TILES = "data/terrain/{z}/{x}/{y}.png";
+const TERRAIN_BOUNDS = [-123.22513, 49.1975, -123.02297, 49.31973];   // the DEM's extent (terrain_tiles.py prints it)
+// The tiles' heights are already exaggerated 5x (terrain_tiles.py VERTICAL_EXAGGERATION): at true
+// scale Vancouver's gentle slopes barely show.
+// It fades to strength_street by street zoom, where the exaggeration would also blow up
+// house-sized bumps left in the DEM where buildings were removed.
+const RELIEF = { strength: 0.6, strength_street: 0.25, light_from_deg: 315,
+                 shadow: "rgba(40, 30, 20, 0.6)", highlight: "rgba(255, 255, 255, 0.4)",
+                 shadowDark: "rgba(0, 0, 0, 0.6)", highlightDark: "rgba(255, 255, 255, 0.12)" };
 const VERSION = "2026-10-02";
 // =============================================================================
 //  END OF CONFIGURATION
@@ -634,7 +665,8 @@ $("mapLegend").innerHTML = [
   [sw(COLOR.park), "Park"],
   [`<span class="swatch dot" style="background:${COLOR.garden};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Community garden"],
   [`<span class="swatch dot small-dot" style="background:${dark ? COLOR.basinDark : COLOR.basin}"></span>`, "Catch basin"],
-].map(([w, t]) => `<div>${w}${t}</div>`).join("") +
+  [sw(dark ? VIEW_3D.assumedDark : VIEW_3D.assumed), "Height assumed", "legend3d"],     // 3D only
+].map(([w, t, id]) => `<div${id ? ` id="${id}" hidden` : ""}>${w}${t}</div>`).join("") +
   `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
 $("notes").innerHTML = [
   `Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.`,
@@ -682,6 +714,23 @@ class CityControl {
   onRemove() { this.el.remove(); }
 }
 map.addControl(new CityControl(), "top-right");
+// A "3D" button under it: the same map tilted into 3D; it then reads "2D" to lay it flat again.
+class ViewControl {
+  onAdd() {
+    this.el = document.createElement("div"); this.el.className = "maplibregl-ctrl maplibregl-ctrl-group";
+    const b = this.button = document.createElement("button"); b.type = "button"; b.className = "city-ctrl"; b.id = "viewBtn";
+    b.addEventListener("click", () => setView(!state.view3d));
+    this.el.appendChild(b); this.label(false); return this.el;
+  }
+  label(is3d) {
+    this.button.textContent = is3d ? "2D" : "3D";
+    const t = is3d ? "Lay the map flat (2D)" : "Tilt the map into 3D: ground and buildings";
+    this.button.title = t; this.button.setAttribute("aria-label", t);
+  }
+  onRemove() { this.el.remove(); }
+}
+const viewControl = new ViewControl();
+map.addControl(viewControl, "top-right");
 map.on("error", e => {
   const m = e && e.error && e.error.message ? e.error.message : "";
   if (loading.isConnected && /style|tiles|Failed to fetch/i.test(m))
@@ -698,13 +747,16 @@ map.on("error", e => {
 // One-lot mode (0) each lot shows its own roofs, purple if they pass 75%;
 // the selected lot (u_sel) shows its roofs plus the card's paving (u_selShare),
 // red to 75% and a purple stripe past it, the same split as its bar.
+// a_z is the corner's ground height in metres (lot-ground.bin), used only in the 3D view:
+// u_zscale turns metres into map units (0 in 2D) and u_zoff is the height MapLibre's camera
+// is already measured from, which its matrix for this kind of layer leaves out.
 const LOT_SHADER = {
   vertex: `
     precision highp float;
-    attribute vec2 a_pos; attribute float a_y; attribute float a_sc; attribute float a_roof; attribute float a_A; attribute float a_id;
-    uniform mat4 u_matrix;
+    attribute vec2 a_pos; attribute float a_y; attribute float a_sc; attribute float a_roof; attribute float a_A; attribute float a_id; attribute float a_z;
+    uniform mat4 u_matrix; uniform float u_zscale, u_zoff;
     varying float v_y, v_sc, v_roof, v_A, v_id;
-    void main() { gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0); v_y = a_y; v_sc = a_sc; v_roof = a_roof; v_A = a_A; v_id = a_id; }`,
+    void main() { gl_Position = u_matrix * vec4(a_pos, (a_z - u_zoff) * u_zscale, 1.0); v_y = a_y; v_sc = a_sc; v_roof = a_roof; v_A = a_A; v_id = a_id; }`,
   fragment: `
     precision highp float;
     uniform float u_hard, u_scenario, u_limit, u_opacity, u_sel, u_selShare;
@@ -724,7 +776,8 @@ const LOT_SHADER = {
 };
 const hexToRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 const ORIGIN = maplibregl.MercatorCoordinate.fromLngLat([-123.12, 49.25]);
-const FLOATS = 7;
+const FLOATS = 8;
+const Z_PER_METRE = maplibregl.MercatorCoordinate.fromLngLat(ORIGIN.toLngLat(), 1).z;   // 1 m in map units
 
 function buildLotMesh(features) {
   const verts = [], idx = [];
@@ -751,7 +804,7 @@ function buildLotMesh(features) {
       });
       const base = verts.length / FLOATS, tri = [];
       for (let i = 0; i < flat.length; i += 3) {
-        verts.push(flat[i], flat[i + 1], flat[i + 2], p.assessed ? 0 : 1, roof, p.A, p._mi);
+        verts.push(flat[i], flat[i + 1], flat[i + 2], p.assessed ? 0 : 1, roof, p.A, p._mi, 0);
         tri.push(flat[i], flat[i + 1]);
       }
       for (const k of earcut(tri, holes)) idx.push(base + k);
@@ -761,7 +814,7 @@ function buildLotMesh(features) {
 }
 
 function lotLayer(mesh) {
-  let prog, vao, loc = {}, gl2, vaoExt;
+  let prog, vao, vbo, glc, loc = {}, gl2, vaoExt;
   const compile = (gl, type, src) => {
     const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
     if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
@@ -769,7 +822,14 @@ function lotLayer(mesh) {
   };
   return {
     id: "lots", type: "custom", renderingMode: "2d",
+    corners: mesh.verts.length / FLOATS,
+    // The 3D view: give every corner its ground height (decimetres, in mesh order).
+    setGround(dm) {
+      for (let i = 0; i < dm.length; i++) mesh.verts[i * FLOATS + 7] = dm[i] / 10;
+      glc.bindBuffer(glc.ARRAY_BUFFER, vbo); glc.bufferSubData(glc.ARRAY_BUFFER, 0, mesh.verts);
+    },
     onAdd(map, gl) {
+      glc = gl;
       gl2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
       if (!gl2) gl.getExtension("OES_element_index_uint");
       vaoExt = gl2 ? null : gl.getExtension("OES_vertex_array_object");
@@ -780,15 +840,15 @@ function lotLayer(mesh) {
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_permeable", "u_impermeable", "u_over", "u_out"])
+      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_permeable", "u_impermeable", "u_over", "u_out", "u_zscale", "u_zoff"])
         loc[u] = gl.getUniformLocation(prog, u);
       vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
       this.bindVAO(vao);
-      const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
       gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
       const ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.idx, gl.STATIC_DRAW);
-      [["a_pos", 2, 0], ["a_y", 1, 8], ["a_sc", 1, 12], ["a_roof", 1, 16], ["a_A", 1, 20], ["a_id", 1, 24]].forEach(([name, size, offset]) => {
+      [["a_pos", 2, 0], ["a_y", 1, 8], ["a_sc", 1, 12], ["a_roof", 1, 16], ["a_A", 1, 20], ["a_id", 1, 24], ["a_z", 1, 28]].forEach(([name, size, offset]) => {
         const a = gl.getAttribLocation(prog, name);
         gl.enableVertexAttribArray(a);
         gl.vertexAttribPointer(a, size, gl.FLOAT, false, FLOATS * 4, offset);
@@ -810,6 +870,8 @@ function lotLayer(mesh) {
       gl.uniform3fv(loc.u_impermeable, hexToRGB(COLOR.impermeable));
       gl.uniform3fv(loc.u_over, hexToRGB(OVER));
       gl.uniform3fv(loc.u_out, hexToRGB(COLOR.out));
+      gl.uniform1f(loc.u_zscale, state.view3d ? Z_PER_METRE : 0);
+      gl.uniform1f(loc.u_zoff, state.view3d ? map.transform.elevation : 0);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       this.bindVAO(vao);
@@ -938,7 +1000,7 @@ function roofLayer(mesh) {
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
     },
     render(gl, matrix) {
-      if (map.getZoom() < BUILDINGS_MIN_ZOOM) return;
+      if (map.getZoom() < BUILDINGS_MIN_ZOOM || state.view3d) return;     // in 3D the buildings stand instead
       const m = Array.from(matrix);
       for (let r = 0; r < 4; r++) m[12 + r] += ORIGIN.x * m[r] + ORIGIN.y * m[4 + r];
       gl.useProgram(prog);
@@ -966,7 +1028,7 @@ function roofLayer(mesh) {
 }
 
 // ---- State -------------------------------------------------------------------------
-const state = { mode: "lot", hard: 0,
+const state = { mode: "lot", hard: 0, view3d: false, lotLayer: null, buildings: null, ground: null,
                 lots: [], byKey: new Map(), assessed: [], selected: null, schedule: [], wallsFrom: "",
                 ready: false, lotResult: null, city: null, count50edge: 0, count50wall: 0 };
 const panel = $("panel");
@@ -981,6 +1043,7 @@ function setMode(mode, moveCamera = true) {
     else if (state.selected) flyToLot(state.selected);
   }
   renderPeek();
+  syncBuildings3D();
   if (state.ready) map.triggerRepaint();     // the map shows the slider only in Every lot
 }
 document.querySelectorAll("#modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
@@ -1248,6 +1311,7 @@ function flyToLot(feature) {
   const rect = panel.getBoundingClientRect();
   const offset = innerWidth > 560 ? [rect.right / 2, 0] : [0, -rect.height / 2];
   map.flyTo({ center: featureCenter(feature), zoom: Math.max(map.getZoom(), FIND_ZOOM), offset });
+  if (state.view3d) aimAfterMove(featureCenter(feature), offset);
 }
 
 function selectLot(feature, fly) {
@@ -1363,9 +1427,125 @@ function cityUpdate() {
   renderLotTotals();
   map.triggerRepaint();
 }
-slider.addEventListener("input", () => { state.hard = +slider.value / 100; cityUpdate(); });
+slider.addEventListener("input", () => { state.hard = +slider.value / 100; cityUpdate(); syncBuildings3D(); });
 
 renderPeek();                                       // the phone's peek row says "Loading…" until the data arrives
+
+// ---- The 3D view ---------------------------------------------------------------------------
+// The same map, tilted: true-scale ground, the lots lifted onto it, the buildings standing.
+// Every control keeps working; only the camera, the ground and the buildings change.
+async function setView(on) {
+  if (!state.ready || on === state.view3d) return;
+  const btn = $("viewBtn");
+  if (on && !state.ground) {                      // the ground under the lots, fetched once
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      const res = await fetch(VIEW_3D.lot_ground);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const dm = new Int16Array(await res.arrayBuffer());
+      if (dm.length !== state.lotLayer.corners)
+        throw new Error(`${dm.length} heights for ${state.lotLayer.corners} lot corners; re-run map/lot_ground.py`);
+      state.lotLayer.setGround(dm);
+      state.ground = dm;
+    } catch (e) {
+      console.warn(`Could not load ${VIEW_3D.lot_ground}; 3D is unavailable.`, e);
+      btn.disabled = false; viewControl.label(false); btn.title = "3D unavailable: the lot ground heights did not load";
+      return;
+    }
+    btn.disabled = false;
+  }
+  viewControl.label(on);
+  $("legend3d").hidden = !on;
+  const shields = v => map.getStyle().layers.filter(l => l.id.startsWith("highway-shield"))   // they float on the horizon when tilted
+    .forEach(l => map.setLayoutProperty(l.id, "visibility", v ? "visible" : "none"));
+  if (on) {
+    const target = map.getCenter().toArray();
+    state.view3d = true;
+    if (!map.getSource("terrain3d"))
+      map.addSource("terrain3d", { type: "raster-dem", tiles: [new URL(TERRAIN_TILES, location.href).href.replace(/%7B/g, "{").replace(/%7D/g, "}")], encoding: "mapbox",
+        tileSize: 256, minzoom: 10, maxzoom: 15, bounds: TERRAIN_BOUNDS });
+    map.setTerrain({ source: "terrain3d", exaggeration: 1 / VIEW_3D.tile_exaggeration });     // true scale
+    map.setSky({ "sky-color": dark ? "#0f1720" : "#bcd6ec", "horizon-color": dark ? "#26303a" : "#eef2f3",
+                 "fog-color": dark ? "#1b1a18" : "#f4f2ed", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7,
+                 "fog-ground-blend": 0.35, "atmosphere-blend": 0.6 });
+    map.setLight({ anchor: "map", position: [1.4, 300, 35], color: "#ffffff", intensity: dark ? 0.3 : 0.45 });
+    shields(false);
+    map.setMaxPitch(80); map.dragRotate.enable(); map.touchPitch.enable(); map.touchZoomRotate.enableRotation();
+    if (state.buildings) addBuildings3D(); else state.loadFootprints();
+    await groundUnder(target);        // tilt once the camera knows how high the ground is here
+    if (!state.view3d) return;
+    aimAfterMove(target, [0, 0]);
+    map.easeTo({ pitch: VIEW_3D.pitch, duration: 1200 });
+  } else {
+    map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+    map.once("moveend", () => {
+      state.view3d = false;
+      map.setTerrain(null);
+      if (map.getLayer("buildings3d")) map.setLayoutProperty("buildings3d", "visibility", "none");
+      shields(true);
+      map.dragRotate.disable(); map.touchPitch.disable(); map.touchZoomRotate.disableRotation(); map.setMaxPitch(0);
+      map.triggerRepaint();
+    });
+  }
+}
+// With 3D ground, MapLibre aims a camera move at the ground height of the place it left, so
+// the target can land off-centre, hidden behind houses. After the move, nudge the camera until
+// the target sits where it should (the middle of the screen plus offset, as flyTo's offset).
+// Only the latest target counts, and only once the camera has really stopped: a flight cut
+// short by a new one also ends with "moveend".
+let aim = null, aiming = false, aimToken = 0;
+function aimAfterMove(target, offset) { aim = { target, offset }; aimToken++; }
+map.on("moveend", () => requestAnimationFrame(() => {
+  // MapLibre 4.7 freezes the camera's ground height for an animated move over 3D ground and
+  // never unfreezes it, so every later move is aimed at that stale height (sea level, if the
+  // ground had not loaded yet). Unfreeze it once the camera has stopped.
+  if (state.view3d && map._elevationFreeze && !map.isMoving()) { map._elevationFreeze = false; map.triggerRepaint(); }
+  if (!state.view3d || aiming || !aim || map.isMoving()) return;
+  const { target, offset } = aim; aim = null;
+  aiming = true; recentre(target, offset, 10);
+  // Ground tiles still loading can shift the view a little: once everything has loaded,
+  // one more pass, unless the camera has been sent somewhere else meanwhile.
+  const token = ++aimToken;
+  map.once("idle", () => { if (token === aimToken && !aiming && state.view3d) { aiming = true; recentre(target, offset, 10); } });
+}));
+// Resolves once the 3D ground under a point has loaded (or after 3 s, e.g. over water).
+function groundUnder(lngLat) {
+  return new Promise(done => {
+    const t0 = performance.now();
+    const check = () => {
+      const z = map.terrain ? map.terrain.getElevationForLngLatZoom(maplibregl.LngLat.convert(lngLat), map.transform.tileZoom) : 0;
+      if (z || performance.now() - t0 > 3000) { map._elevationFreeze = false; map.triggerRepaint(); requestAnimationFrame(() => done()); }
+      else setTimeout(check, 100);
+    };
+    check();
+  });
+}
+function recentre(target, offset, tries) {
+  const at = map.project(target), c = map.getCanvas();
+  const dx = at.x - (c.clientWidth / 2 + offset[0]), dy = at.y - (c.clientHeight / 2 + offset[1]);
+  if (tries <= 0 || Math.hypot(dx, dy) < 3 || !state.view3d) { aiming = false; return; }
+  map.panBy([dx, dy], { duration: 0 });
+  requestAnimationFrame(() => recentre(target, offset, tries - 1));
+}
+// The buildings, standing at their heights, from the footprints already loaded for the roofs.
+function addBuildings3D() {
+  if (!map.getSource("buildings3d")) {
+    for (const f of state.buildings) f.properties.rs = f._rs;      // its site's roof share (roofShares)
+    map.addSource("buildings3d", { type: "geojson", data: { type: "FeatureCollection", features: state.buildings } });
+    map.addLayer({ id: "buildings3d", type: "fill-extrusion", source: "buildings3d", minzoom: BUILDINGS_MIN_ZOOM,
+      paint: { "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": 0,
+               "fill-extrusion-color": ["case", ["==", ["get", "src"], "P"], dark ? VIEW_3D.assumedDark : VIEW_3D.assumed, dark ? COLOR.roofDark : COLOR.roof],
+               "fill-extrusion-opacity": 0.95, "fill-extrusion-vertical-gradient": true } }, "selected-casing");
+  }
+  map.setLayoutProperty("buildings3d", "visibility", "visible");
+  syncBuildings3D();
+}
+// In Every-lot mode a building stands once the slider reaches its site's roof share, as its
+// roof appears in 2D (the roof layer's test: rs <= slider).
+function syncBuildings3D() {
+  if (!map.getLayer("buildings3d")) return;
+  map.setFilter("buildings3d", state.mode === "city" ? ["<=", ["get", "rs"], state.hard + 1e-5] : null);
+}
 
 // ---- Load ------------------------------------------------------------------------------
 map.on("load", async () => {
@@ -1401,7 +1581,8 @@ map.on("load", async () => {
   map.getStyle().layers.filter(l => l["source-layer"] === "building")
      .forEach(l => map.setLayoutProperty(l.id, "visibility", "none"));
   const firstLabel = map.getStyle().layers.find(l => l.type === "symbol")?.id;
-  map.addLayer(lotLayer(buildLotMesh(data.features)), firstLabel);
+  state.lotLayer = lotLayer(buildLotMesh(data.features));
+  map.addLayer(state.lotLayer, firstLabel);
   map.addLayer({ id: "lot-hit-area", type: "fill", source: "lots", paint: { "fill-color": "#000", "fill-opacity": 0.02 } }, firstLabel);
   map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
     paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.3, 18, 1.5] } }, firstLabel);
@@ -1415,6 +1596,18 @@ map.on("load", async () => {
   map.addLayer({ id: "park-labels", type: "symbol", source: "parks", minzoom: 14,
     layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Bold"], "text-size": 12, "symbol-placement": "point" },
     paint: { "text-color": dark ? "#cfe8cf" : "#1d4d24", "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
+  // Shaded relief, over the lots and parks (they are nearly opaque, so relief under them would
+  // not show) and under everything drawn after this: basins, gardens, the check rings, the
+  // selection, the roofs and the labels. A picture only; no number on the page uses it.
+  map.addSource("terrain", { type: "raster-dem", tiles: [new URL(TERRAIN_TILES, location.href).href.replace(/%7B/g, "{").replace(/%7D/g, "}")],
+    encoding: "mapbox", tileSize: 256, minzoom: 10, maxzoom: 15, bounds: TERRAIN_BOUNDS,
+    attribution: "Relief: City of Vancouver 2013 DEM" });
+  map.addLayer({ id: "relief", type: "hillshade", source: "terrain",
+    paint: { "hillshade-exaggeration": ["interpolate", ["linear"], ["zoom"], 15, RELIEF.strength, 18, RELIEF.strength_street],
+             "hillshade-illumination-direction": RELIEF.light_from_deg,
+             "hillshade-illumination-anchor": "map", "hillshade-accent-color": "rgba(0, 0, 0, 0)",
+             "hillshade-shadow-color": dark ? RELIEF.shadowDark : RELIEF.shadow,
+             "hillshade-highlight-color": dark ? RELIEF.highlightDark : RELIEF.highlight } }, firstLabel);
   // Catch basins: where the street's water goes today, a small dot each.
   map.addSource("basins", { type: "geojson", data: BASINS_FILE });
   map.addLayer({ id: "basins", type: "circle", source: "basins", minzoom: BASINS_MIN_ZOOM,
@@ -1512,6 +1705,8 @@ map.on("load", async () => {
       const buildings = await res.json();
       roofShares(buildings.features, state.lots);
       map.addLayer(roofLayer(buildRoofMesh(buildings.features)), "selected-casing");
+      state.buildings = buildings.features;
+      if (state.view3d) addBuildings3D();
       roofsNote.hidden = true;
     } catch (e) {
       console.warn(`Could not load ${BUILDINGS_FILE}; roofs are not drawn.`, e);
@@ -1519,6 +1714,7 @@ map.on("load", async () => {
     }
   };
   map.on("zoomend", loadFootprints);
+  state.loadFootprints = loadFootprints;
   loadFootprints();
 });
 </script>

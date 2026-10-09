@@ -8,3 +8,7 @@ numpy==2.0.2
 pyproj==3.6.1
 pyogrio==0.11.1
 requests==2.32.5
+# map/terrain_tiles.py only (the shaded relief), added 2026-10-06:
+tifffile==2024.8.30
+imagecodecs==2024.12.30
+pillow==11.3.0
