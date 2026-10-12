@@ -18,6 +18,11 @@ WHAT IT READS
   map/data/parks.geojson      the park outlines
   map/data/park-lots.json     sites that are park land (map/park_lots.py); like
                               the page, they send no water. Optional.
+  cache/zoning-districts-and-labels-*.geojson   the R1-1 zoning districts, and
+  cache/property-parcel-polygons-*.geojson      every parcel in the city (both
+                              from the City's open data, cached by buildings.py):
+                              streets and lanes are the ground inside R1-1 zoning
+                              that is in no parcel and no park. Optional.
 
 WHAT IT WRITES
   map/data/flow-paths.geojson  one line per stretch of downhill path, between
@@ -27,8 +32,9 @@ WHAT IT WRITES
                                and d its deepest point in m.
   map/data/water.json          the network the page routes water through:
                                for every path and low spot, the next one
-                               downhill, the R1-1 lot area that drains
-                               straight into it, its volume (low spots), and
+                               downhill, the R1-1 lot area (a) and street and
+                               lane area (s) that drain straight into it, its
+                               volume (low spots), and
                                the park it lies in; and for every lot, the
                                first path or low spot its water enters (so
                                the page can draw the lot's route), and the
@@ -67,8 +73,9 @@ LIMITS (say these out loud next to any result)
     for water standing beside roads and walks.
   - Low spots listed in NOT_LOW_SPOTS are left out by hand, as ground-model
     artifacts; their water runs on downhill as path.
-  - Only water from R1-1 lots is routed; streets, lanes and other zones are
-    not counted.
+  - Water is routed from R1-1 lots and from the streets and lanes in R1-1
+    zoning; other zones are not counted. Zoning runs to the street centre, so
+    a street on the edge of R1-1 counts by half.
 
 HOW TO RUN IT
      source .venv/bin/activate
@@ -127,6 +134,10 @@ PATH_MIN_LOT_M2 = 4000.0  # a path is drawn where at least this much R1-1 lot ar
                           # drains through it: about ten lots
 SIMPLIFY_M = 1.5          # drawn lines and outlines are smoothed to this, m
 NOT_A_SITE_M2 = 150       # same rule as the page: smaller parcels are not assessed
+ZONING_FILES = sorted((ROOT / "cache").glob("zoning-districts-and-labels-*.geojson"))
+PARCEL_FILES = sorted((ROOT / "cache").glob("property-parcel-polygons-*.geojson"))
+STREETS = True            # route the water of streets and lanes too (Kevin's call, 2026-10-11:
+                          # "try it"); False = lots only
 PARK_LOTS_FILE = DATA / "park-lots.json"   # park land the page does not assess (Kevin's call,
                           # 2026-10-11); these send no water either. Missing = none
 NODATA = -9999.0
@@ -521,6 +532,19 @@ def main():
     acc = accumulate(order, recv, w)
     log(f"  {w.sum() / 1e6:.1f} km² of assessed lot area routed")
 
+    # Street and lane area per cell: inside R1-1 zoning, in no parcel and no park.
+    ws = np.zeros(rows * cols, dtype=np.float64)
+    if STREETS and ZONING_FILES and PARCEL_FILES:
+        zoning = json.load(open(ZONING_FILES[-1]))["features"]
+        parcels = json.load(open(PARCEL_FILES[-1]))["features"]
+        in_r11 = burn(grid, zoning, lambda i, f: 1).ravel() > 0
+        in_parcel = burn(grid, parcels, lambda i, f: 1).ravel() > 0
+        street = in_r11 & ~in_parcel & (park_id == 0) & (lot_id == 0) & np.isfinite(zr)
+        ws[street] = cell_area
+        log(f"  {ws.sum() / 1e6:.1f} km² of streets and lanes in R1-1 zoning routed ({len(parcels):,} parcels)")
+    elif STREETS:
+        log("  zoning or parcel file not in cache/: streets and lanes left out")
+
     log("Finding low spots…")
     depth = np.where(np.isfinite(filled), filled - zr, 0).astype(np.float32)
     pond = depth if not SKIP_UNDER_HOUSES else np.where(under_house, 0, depth)
@@ -577,6 +601,7 @@ def main():
     down[S:] = spot_down(deepest, S + np.arange(K), recv, node_cell)
     has = first >= 0
     a_local = np.bincount(first[has], weights=w[has], minlength=S + K)
+    s_local = np.bincount(first[has], weights=ws[has], minlength=S + K)
     v_node = np.zeros(S + K)
     v_node[S:] = vol[spot_ids]
     park_node = np.full(S + K, -1, dtype=np.int64)
@@ -624,11 +649,12 @@ def main():
         "settings": {"cell_m": CELL_M, "house_raise_m": HOUSE_RAISE_M, "spot_min_depth_m": SPOT_MIN_DEPTH_M,
                      "spot_min_volume_m3": SPOT_MIN_VOLUME_M3, "path_min_lot_m2": PATH_MIN_LOT_M2,
                      "skip_under_houses": SKIP_UNDER_HOUSES, "spot_max_depth_m": SPOT_MAX_DEPTH_M,
-                     "pond_cap_m": POND_CAP_M, "sea_m": SEA_M,
+                     "pond_cap_m": POND_CAP_M, "sea_m": SEA_M, "streets": STREETS,
                      "not_low_spots": [why for _, _, why in NOT_LOW_SPOTS]},
         "paths": S, "spots": K,
         "down": down.tolist(),
         "a": np.round(a_local).astype(int).tolist(),
+        "s": np.round(s_local).astype(int).tolist(),
         "v": np.round(v_node).astype(int).tolist(),
         "park": park_node.tolist(),
         "order": order_nodes,
