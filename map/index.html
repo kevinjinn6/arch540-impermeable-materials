@@ -70,6 +70,9 @@ WHERE THE DATA COMES FROM
                            representation", open data, 2026-09-28), drawn
                            green under the lots: n name, c class, ha area.
                            Urban plazas (paved) are left out.
+  data/park-lots.json      sites more than half inside a park with no roof
+                           (map/park_lots.py): park land zoned R1-1, not
+                           assessed. Without the file they count as lots.
   data/gardens.geojson     community gardens ("Community gardens and food
                            trees", 2026-07-14): n name, pl plots. Sites with
                            food trees only are left out.
@@ -538,6 +541,7 @@ const DATA_FILE = "data/lots.geojson";
 const WALLS_FILE = "data/roof-walls.json";
 const BUILDINGS_FILE = "data/buildings.geojson";
 const PARKS_FILE = "data/parks.geojson";
+const PARK_LOTS_FILE = "data/park-lots.json";
 const GARDENS_FILE = "data/gardens.geojson";
 const BASINS_FILE = "data/catch-basins.geojson";
 // The shaded relief: ground heights from the 2013 DEM, lit from the northwest (the cartographic
@@ -670,7 +674,7 @@ $("mapLegend").innerHTML = [
   `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
 $("notes").innerHTML = [
   `Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.`,
-  `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m² and flagged parcels are grey: not assessed.`,
+  `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m², flagged parcels and park land with no building are grey: not assessed.`,
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
   `Paving is in no City dataset: the schedule and the slider are hypotheses you set. Not a compliance finding; a reviewer measures from a survey.`,
   `At exactly ${L * 100}% a lot passes. Colours use unrounded areas.`,
@@ -1074,6 +1078,7 @@ function lotFlags(p) {
   if (p.cd) flags.push("roof over 90% of the parcel: check the data");
   if (p.sc === 1) flags.push("large site over 2,000 m²: outside this map's scope");
   if (p.sc === 2) flags.push("road allowance or other non-lot: outside scope");
+  if (p.pk) flags.push(`park land (${p.pk}) with no building: not a house lot`);
   if (p.A < NOT_A_SITE_M2) flags.push(`under ${NOT_A_SITE_M2} m²: not assessed as a site`);
   else if (p.A < BYLAW.min_site_area_m2) flags.push(`below the ${BYLAW.min_site_area_m2} m² minimum site area of s.3.2.2.1: an existing small lot, or part of a larger site`);
   return flags;
@@ -1562,13 +1567,17 @@ map.on("load", async () => {
     try { walls = await (await fetch(WALLS_FILE)).json(); state.wallsFrom = WALLS_FILE; }
     catch (e) { console.warn(`${WALLS_FILE} not found; roof areas are used as traced (roof edge).`); }
   }
+  let parkLots = {};
+  try { parkLots = (await (await fetch(PARK_LOTS_FILE)).json()).lots; }
+  catch (e) { console.warn(`${PARK_LOTS_FILE} not found; lots inside parks are counted as house lots.`); }
   // Attach rw and the assessed flag to every feature; both the mesh and the labels read them.
   for (const f of data.features) {
     const p = f.properties;
     p.A = Number(p.A); p.r = Number(p.r || 0);
     p.rw = hasRw ? Number(p.rw) : walls && walls.rw[p.k] !== undefined ? Number(walls.rw[p.k]) : p.r;
     p.rw = Math.min(p.rw, p.r);
-    p.assessed = p.sc === 0 && !p.cd && !p.f && p.A >= NOT_A_SITE_M2 ? 1 : 0;
+    if (parkLots[p.k]) p.pk = parkLots[p.k];    // park land with no building: not a house lot
+    p.assessed = p.sc === 0 && !p.cd && !p.f && !p.pk && p.A >= NOT_A_SITE_M2 ? 1 : 0;
     p.adn = normalise(p.ad);                 // for the address search
   }
   state.lots = data.features;
