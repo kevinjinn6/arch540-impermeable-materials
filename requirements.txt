@@ -12,3 +12,5 @@ requests==2.32.5
 tifffile==2024.8.30
 imagecodecs==2024.12.30
 pillow==11.3.0
+# map/water_layers.py only (the Water layers), added 2026-10-06; also uses tifffile and pillow above:
+numba==0.60.0

@@ -79,6 +79,11 @@ WHERE THE DATA COMES FROM
   data/catch-basins.geojson  the City's street catch basins ("Sewer catch
                            basins", 2026-10-05; locations approximate), one
                            MultiPoint, drawn from street zoom in.
+  data/water.json, data/flow-paths.geojson, data/low-spots.geojson
+                           where the water goes downhill, for the "Water"
+                           button (map/water_layers.py; read by water.js,
+                           which explains the model). Loaded only when
+                           Water is first switched on.
   data/terrain/{z}/{x}/{y}.png  ground heights for the shaded relief, from
                            the City's 2013 bare-earth DEM (map/terrain_tiles.py;
                            heights x5 so slopes show, about 3 m per pixel). Picture only:
@@ -1743,5 +1748,7 @@ map.on("load", async () => {
   loadFootprints();
 });
 </script>
+<!-- The "Water" button and layers: where the rain goes once it leaves the lots (water.js). -->
+<script src="water.js"></script>
 </body>
 </html>
