@@ -1693,7 +1693,8 @@ function cityUpdate() {
   $("cityHint").innerHTML = hardPct === 0
     ? `An empty lot: all permeable. The ${int(state.noRoof)} that fit have no roof in the 2015 air photo. Drag right; each house appears when the slider reaches its roof share.`
     : atMax
-      ? `The by-law maximum: every lot is at its limit and passes.` + (over ? ` ${int(over)} ${over === 1 ? "house doesn't fit: its roofs alone are" : "houses don't fit: their roofs alone are"} over ${L * 100}%.` : "")
+      ? (over ? `The by-law maximum: every lot is at its limit, and all pass but ${int(over)}, ${over === 1 ? "whose roofs alone are" : "whose roofs alone are each"} over ${L * 100}%.`
+              : `The by-law maximum: every lot is at its limit and passes.`)
       : past
         ? `Past the limit: every lot fails by ${+(hardPct - L * 100).toFixed(1)}% of its site, the striped purple band.`
         : `A house shows once its roofs fit within ${hardPct}% of its lot.`;
