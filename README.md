@@ -36,7 +36,10 @@ brings it back.
    marked at 50% and 75% (dark is roof, slate is paving, sand is room left,
    striped purple is over the limit), then **PASS** or **FAIL** with the
    margin in square metres, and a reminder that the roofs come from the 2015
-   air photo (click it for the assumptions). Under it: the 2015 roofs
+   air photo (click it for the assumptions). Where the City has issued a
+   new-building or demolition permit on the lot since 2017, an amber-edged
+   note says the 2015 roofs may be out of date, and the map label adds the
+   permit (e.g. *permit: laneway 2022*). Under it: the 2015 roofs
    measured to the walls, the 50% buildings rule, and the room s.3.2.2.8
    leaves after the roofs. Tap any blue reference, such as
    *s.3.2.2.8 · p.12*, to read that passage in place.
@@ -121,6 +124,7 @@ python stormwater.py          # R1-1 parcels            -> r11_stormwater.geojso
 python buildings.py           # sites, 2015 roofs       -> map/data/lots.geojson, buildings.geojson
 python map/roof_walls.py      # roofs to the walls      -> map/data/roof-walls.json
 python map/park_lots.py       # empty park land, not assessed -> map/data/park-lots.json
+python map/permits.py         # permits since 2017, out-of-date roofs -> map/data/permits.json
 python3 map/check_data.py     # the figures below still hold?
 ```
 
@@ -140,6 +144,7 @@ python map/water_layers.py    # where the water goes      -> map/data/water.json
 | Zoning and Development By-law No. 3575, **R1-1 District Schedule** (`sources/zoning-by-law-district-schedule-r1-1.pdf`) | June 2026 consolidation, 17 pp. | s.3.2 and s.3.2.2.1 (p.12), **s.3.2.2.7** and **s.3.2.2.8** (p.12), s.2.2.4 (p.5), **s.4.2.2** (p.16) |
 | Zoning and Development By-law No. 3575, **Section 2 Definitions** (`sources/zoning-by-law-section-2.pdf`) | June 2026 consolidation, 50 pp. | **Impermeable Materials** (p.20), **Permeable Materials** (p.31), Deck (p.11), Patio (p.30), Site (p.43) |
 | City of Vancouver open data | property parcel polygons (retrieved 2026-09-21), building footprints 2015 and 2009 (2026-09-25) | site outlines and areas, roof footprints, heights for the Rhino drawing only |
+| City of Vancouver open data | issued building permits, 2017 onward (retrieved 2026-10-11) | flags lots rebuilt or demolished since the 2015 roofs; in no figure |
 | City of Vancouver open data | 2013 digital elevation model; parks, community gardens, catch basins (2026) | the shaded relief, the 3D ground and the Water view; context only, in no compliance figure |
 | Rain City Strategy (2019) | Council policy, **not a by-law** | the 48 mm daily design standard in the storm card and the Rain City point, as context |
 
@@ -237,7 +242,11 @@ against the source by hand.
   measured to the walls, 769. The air photo cannot tell which is right for
   any one house, so those 769 are marked *check*, not *exceedance*. 787
   assessed lots have no 2015 roof at all (empty, or between a teardown and a
-  new house, when the photo was taken); they count as 0% roofs.
+  new house, when the photo was taken); they count as 0% roofs. 5,850
+  assessed lots (9.4%) have had a new-building or demolition permit since
+  2017, matched by address: the map flags them, but their figures still use
+  the 2015 roofs. Permits from 2015 and 2016, and additions, are not
+  counted, so other lots may have changed too.
 - **Driveways, patios and walks are in no City dataset.** The lot schedule
   and the slider are hypotheses you set, they are not a survey of existing
   paving. The page is not a compliance finding.
@@ -291,6 +300,7 @@ map/
   rhino_site.py               draws any lot from the map's data in Rhino 8
   roof_walls.py               roof area to the walls per site -> data/roof-walls.json
   park_lots.py                empty park land zoned R1-1, not assessed -> data/park-lots.json
+  permits.py                  new-building and demolition permits since 2017, per lot -> data/permits.json
   terrain_tiles.py            shaded relief and 3D ground from the 2013 DEM -> data/relief/, data/terrain/
   lot_ground.py               ground height under every lot corner, for 3D -> data/lot-ground.bin
   water_layers.py             flow paths and low spots for the Water view -> data/water.json, ...

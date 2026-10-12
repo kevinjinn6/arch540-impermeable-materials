@@ -73,6 +73,10 @@ WHERE THE DATA COMES FROM
   data/park-lots.json      sites more than half inside a park with no roof
                            (map/park_lots.py): park land zoned R1-1, not
                            assessed. Without the file they count as lots.
+  data/permits.json        lots where the City has issued a new-building or
+                           demolition permit since 2017 (map/permits.py): their
+                           2015 roofs may be out of date. A flag only; no
+                           figure changes. Without the file there are no flags.
   data/gardens.geojson     community gardens ("Community gardens and food
                            trees", 2026-07-14): n name, pl plots. Sites with
                            food trees only are left out.
@@ -392,6 +396,8 @@ WHERE THE DATA COMES FROM
   /* The roofs' age, one line under each verdict; it opens Assumptions and limits. */
   .roofage { display: block; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
   .roofage:hover { color: var(--accent); }
+  .permit-note { margin: 8px 0 2px; padding: 6px 0 6px 10px; border-left: 3px solid var(--check-ink); font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .permit-note b { color: var(--ink); font-weight: 600; }
   #cityHint { margin: 8px 0 0; }
   .tag { display: inline-block; font-size: 12px; line-height: 16px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; margin-bottom: 6px; }
@@ -508,7 +514,7 @@ WHERE THE DATA COMES FROM
 
     <section id="modeCity" role="tabpanel" aria-labelledby="tabCity">
       <div id="cityHero" aria-live="polite"></div>
-      <button type="button" class="linkbtn caption roofage" data-notes>Roofs: 2015 air photo · newer buildings missing ›</button>
+      <button type="button" class="linkbtn caption roofage" data-notes id="cityRoofAge">Roofs: 2015 air photo · newer buildings missing ›</button>
       <!-- The Rain City point: the share at which a lot keeps the storm on site. Not the by-law. -->
       <div class="rc" id="rc">
         <div id="rcLine"></div>
@@ -678,6 +684,7 @@ const WALLS_FILE = "data/roof-walls.json";
 const BUILDINGS_FILE = "data/buildings.geojson";
 const PARKS_FILE = "data/parks.geojson";
 const PARK_LOTS_FILE = "data/park-lots.json";
+const PERMITS_FILE = "data/permits.json";     // new-building and demolition permits since 2017, per lot (map/permits.py)
 const GARDENS_FILE = "data/gardens.geojson";
 const BASINS_FILE = "data/catch-basins.geojson";
 // The shaded relief: drawn by map/terrain_tiles.py from the 2013 DEM (lit from the northwest,
@@ -834,6 +841,7 @@ $("mapLegend").innerHTML = [
 $("notes").innerHTML = [
   `<span id="noteRoofs">Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.</span>`,
   `<span id="noteNoRoof">Every figure counts the same lots: every assessed R1-1 lot.</span>`,
+  `<span id="notePermits"></span>`,
   `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m², flagged parcels and park land with no building are hatched: not assessed.`,
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
   `Paving is in no City dataset: the schedule and the slider are hypotheses you set. Not a compliance finding; a reviewer measures from a survey.`,
@@ -1349,6 +1357,24 @@ function openNotes(id = "notes") {
   if (panel.dataset.sheet === "peek" && innerWidth <= 560) panel.dataset.sheet = "full";
   $("bylaw").open = true; $(id).scrollIntoView({ behavior: "smooth", block: "start" });
 }
+// A permit in words: ["2022-11-14", "new", "Laneway House"] -> "laneway 2022"; the card says it longer.
+function permitWords(x, long = false) {
+  const [date, kind, use] = x, y = date.slice(0, 4), u = (use || "").toLowerCase();
+  const [short, words] = kind === "demo" ? ["demolition", "a demolition"]
+    : /laneway/.test(u) ? ["laneway", "a new laneway house"]
+    : /duplex/.test(u) ? ["duplex", "a new duplex"]
+    : /single detached|infill single/.test(u) ? ["new house", "a new house"]
+    : /multiple dwelling|townhouse|apartment/.test(u) ? ["multiplex", "a new multiplex"]
+    : ["new building", "a new building"];
+  return long ? `${words} (${y})` : `${short} ${y}`;
+}
+// The note under a lot's verdict when the City has issued a new-building or demolition permit
+// there since 2017: its 2015 roofs may be out of date. The figures are not changed.
+function permitNote(p) {
+  if (!p.pm) return "";
+  const list = p.pm.map(x => permitWords(x, true)).join(", ");
+  return `<div class="permit-note" role="note"><b>The 2015 roofs may be out of date here.</b> The City has issued permits since 2017 for ${list}.</div>`;
+}
 // "Roofs: 2015 air photo" beside each verdict opens the assumptions (the cards are rebuilt, so listen on the panel).
 panel.addEventListener("click", e => { if (e.target.closest("[data-notes]")) openNotes("noteRoofs"); });
 
@@ -1367,7 +1393,7 @@ function renderLot() {
   if (!p.assessed) {
     html += `<div class="areabar out" aria-hidden="true"></div>` +
       `<div class="verdict"><span class="pill out">Not assessed</span></div>` +
-      `<p style="margin:8px 0 0">${cap(flags.join(". "))}.</p>` +
+      `<p style="margin:8px 0 0">${cap(flags.join(". "))}.</p>` + permitNote(p) +
       `<div class="rows"><button type="button" class="row linkrow" id="whyGrey">Why some lots are hatched${CHEV}</button></div>`;
     el.innerHTML = html;
     $("whyGrey").addEventListener("click", () => openNotes());
@@ -1388,6 +1414,7 @@ function renderLot() {
   // The verdict, then the passage it rests on, one tap away.
   html += `<div class="verdict" aria-live="polite"><span class="pill" id="pill"></span><b class="display" id="margin"></b></div>` +
     `<button type="button" class="linkbtn caption roofage" data-notes>Roofs: 2015 air photo · newer buildings missing ›</button>` +
+    permitNote(p) +
     `<details class="ref"><summary class="caption">${chip(shortRef(P75.ref))} · with the paving below</summary>${passage("s3228")}</details>`;
   // Three facts: the roofs, the 50% rule, the room.
   html += `<div class="facts">` +
@@ -2062,6 +2089,9 @@ map.on("load", async () => {
     try { walls = await (await fetch(WALLS_FILE)).json(); state.wallsFrom = WALLS_FILE; }
     catch (e) { console.warn(`${WALLS_FILE} not found; roof areas are used as traced (roof edge).`); }
   }
+  let permits = {};
+  try { permits = (await (await fetch(PERMITS_FILE)).json()).lots; }
+  catch (e) { console.warn(`${PERMITS_FILE} not found; no lot is flagged as rebuilt since 2015.`); }
   let parkLots = {};
   try { parkLots = (await (await fetch(PARK_LOTS_FILE)).json()).lots; }
   catch (e) { console.warn(`${PARK_LOTS_FILE} not found; lots inside parks are counted as house lots.`); }
@@ -2074,6 +2104,7 @@ map.on("load", async () => {
     if (parkLots[p.k]) p.pk = parkLots[p.k];    // park land with no building: not a house lot
     p.assessed = p.sc === 0 && !p.cd && !p.f && !p.pk && p.A >= NOT_A_SITE_M2 ? 1 : 0;
     p.adn = normalise(p.ad);                 // for the address search
+    if (permits[p.k]) { p.pm = permits[p.k]; p.pml = `permit: ${permitWords(p.pm[p.pm.length - 1])}`; }   // the newest, for the map label
   }
   state.lots = data.features;
   state.byKey = new Map(data.features.map(f => [f.properties.k, f]));
@@ -2081,6 +2112,15 @@ map.on("load", async () => {
   state.count50edge = state.assessed.filter(p => p.r > BYLAW.building_limit * p.A + 1e-9).length;
   state.count50wall = state.assessed.filter(p => p.rw > BYLAW.building_limit * p.A + 1e-9).length;
   state.noRoof = state.assessed.filter(p => !(p.r > 0)).length;
+  state.permitLots = state.assessed.filter(p => p.pm).length;
+  if (state.permitLots) {
+    const noRoofBuilt = state.assessed.filter(p => !(p.r > 0) && p.pm && p.pm.some(x => x[1] === "new")).length;
+    $("cityRoofAge").textContent = `Roofs: 2015 air photo · ${int(state.permitLots)} lots (${(state.permitLots / state.assessed.length * 100).toFixed(1)}%) rebuilt or demolished since 2017 ›`;
+    $("notePermits").textContent = `Out-of-date roofs: ${int(state.permitLots)} assessed lots have had a new-building or demolition permit issued since 2017 ` +
+      `(City of Vancouver, "Issued building permits"; matched by the lot's address). Their card and map label say so; their figures still use the 2015 roofs. ` +
+      `Permits from 2015 and 2016 are not in that data, and additions and alterations are left out, so other lots may have changed too. ` +
+      `${int(noRoofBuilt)} of the ${int(state.noRoof)} lots with no 2015 roof have had a new-building permit since.`;
+  } else $("notePermits").closest("li").hidden = true;
   $("noteNoRoof").textContent = `Every figure counts the same ${int(state.assessed.length)} assessed lots. ` +
     `${int(state.noRoof)} of them (${(state.noRoof / state.assessed.length * 100).toFixed(1)}%) have no roof in the 2015 footprints: ` +
     `empty, or between a teardown and a new house, when the photo was taken. They count as 0% roofs, so they fit at every slider setting; a house built on them since is missing.`;
@@ -2175,8 +2215,10 @@ map.on("load", async () => {
       // two lines, figures in bold: "roofs 38%" over "room 224 m²"
       "text-field": ["format",
         "roofs ", {}, ["concat", ["to-string", ["round", ["*", 100, ["/", ["get", "rw"], ["get", "A"]]]]], "%"], { "text-font": ["literal", ["Noto Sans Bold"]] },
-        "\nroom ", {}, ["concat", ["to-string", ["round", ["-", ["*", BYLAW.impermeable_limit, ["get", "A"]], ["get", "rw"]]]], " m²"], { "text-font": ["literal", ["Noto Sans Bold"]] }],
-      "text-font": ["Noto Sans Regular"], "text-size": 11, "text-line-height": 1.25, "symbol-placement": "point" },
+        "\nroom ", {}, ["concat", ["to-string", ["round", ["-", ["*", BYLAW.impermeable_limit, ["get", "A"]], ["get", "rw"]]]], " m²"], { "text-font": ["literal", ["Noto Sans Bold"]] },
+        // a lot rebuilt or demolished since 2017: "permit: laneway 2022", so its 2015 roofs read as doubtful
+        ["case", ["has", "pml"], ["concat", "\n", ["get", "pml"]], ""], { "text-color": dark ? "#ffbf47" : "#8a4b06" }],
+      "text-font": ["Noto Sans Regular"], "text-size": 11, "text-line-height": 1.25, "text-max-width": 14, "symbol-placement": "point" },
     paint: { "text-color": dark ? "#f2f0eb" : "#1c1b18", "text-halo-color": dark ? "#1b1a18" : "#fbfaf7", "text-halo-width": 2, "text-halo-blur": 0.5 } });
   map.addLayer({ id: "scope-labels", type: "symbol", source: "lots", minzoom: 16,
     filter: ["any", ["==", ["get", "sc"], 1], ["==", ["get", "cd"], 1], ["==", ["get", "f"], 1]],
