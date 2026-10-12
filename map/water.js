@@ -438,7 +438,7 @@ function renderCard() {
       `<li><button type="button" data-node="${u}">${esc(spotName(u))}</button> · ${nice(standing(u))} m³</li>`).join("") + `</ol>` : "") +
     (topParks.length ? `<h3>Parks the water reaches</h3><ol>` + topParks.map(([p, m3]) =>
       `<li><button type="button" data-park="${p}">${esc(water.parks[p].n)}</button> · ${nice(m3)} m³</li>`).join("") + `</ol>` : "") +
-    `<div class="caption" style="margin-top:6px">Click a place on the map to see the lots that drain to it.</div>` +
+    `<div class="caption" style="margin-top:6px">Click a park, a flooded place or a water path to see the lots that drain to it.</div>` +
     `<div class="keys" style="margin-top:8px">` +
       (map.getLayer("water-contours") ? key(CONTOUR, "contour, in m", true) : "") +
       (water.route.length ? key(WATER_ROUTE, "this lot's way down", true) : "") + `</div>` +
@@ -491,11 +491,17 @@ function pick(place, fly) {
   }
   renderCard();
 }
+// A park, for the hover and the card: the water arriving in this storm. Parks hold none
+// in this model (Kevin's call, 2026-10-06): no figure for how much a park can take is set yet.
+function describePark(p) {
+  const m3 = water.last.arrive.get(p) || 0;
+  return `<b>${esc(water.parks[p].n)}</b><br>` + (m3 >= 1 ? `${nice(m3)} m³ of water arrives in ${stormTitle()}`
+    : `no water arrives in ${stormTitle()}: the soil and pipes above it take it all`);
+}
 function pickHtml(p) {
   const n = p.lots ? p.lots.length.toLocaleString("en-CA") : "";
   if (p.park !== undefined)
-    return `<b>${esc(water.parks[p.park].n)}</b> · ${nice(water.last.arrive.get(p.park) || 0)} m³ arrives` +
-      (p.lots.length ? `<br>${n} lots (${ha(p.area)}) reach this park first, tinted on the map.` : "");
+    return describePark(p.park) + (p.lots.length ? `<br>${n} lots drain toward it, tinted on the map.` : `<br>No lot drains toward it first.`);
   return describeNode(p.node) + (p.lots === null ? "" : p.lots.length ? `<br>${n} lots drain here, tinted on the map.`
                                                                       : `<br>No lot's water traced here.`);
 }
@@ -684,28 +690,41 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && water.pick
 // ---- On the map: hover a path or low spot for its numbers, click it for its catchment ----
 // A click also reaches the lot underneath, as before: its card opens and its own way down is drawn.
 const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: "water-tip", offset: 12, maxWidth: "260px" });
+// What is under the pointer, as a place to pick: { node } for a path or low spot that is
+// drawn (a hidden low spot does not count), { park } for a park, or null.
 const waterAt = point => {
   if (!water.on || !water.last || !map.getLayer("water-paths")) return null;
   const box = [[point.x - 4, point.y - 4], [point.x + 4, point.y + 4]];
   // The amber check sites stay clickable as lots.
   if (map.queryRenderedFeatures(box, { layers: ["check-clusters", "check-single"].filter(id => map.getLayer(id)) }).length) return null;
-  const f = map.queryRenderedFeatures(box, { layers: ["water-paths", "water-spots"] })
-    .find(f => f.layer.id === "water-spots" || WATER.dry_paths || (map.getFeatureState({ source: "water-paths", id: f.id }).q || 0) > 0.5);
-  return f ? +f.id : null;
+  const drawn = f => {
+    const st = map.getFeatureState({ source: f.layer.id === "water-spots" ? "water-spots" : "water-paths", id: f.id });
+    if (f.layer.id === "water-spots") return water.mode === "flood" ? true : !!st.spill;
+    return WATER.dry_paths || (st.q || 0) > 0.5;
+  };
+  const f = map.queryRenderedFeatures(box, { layers: ["water-paths", "water-spots"] }).find(drawn);
+  if (f) return { node: +f.id };
+  // A park: the parks layer has no ids, so find it by name, nearest the pointer if two share one.
+  const pk = map.getLayer("parks") && map.queryRenderedFeatures(point, { layers: ["parks"] })[0];
+  if (!pk) return null;
+  const ll = map.unproject(point), named = water.parks.map((q, i) => [q, i]).filter(([q]) => q.n === pk.properties.n);
+  if (!named.length) return null;
+  named.sort(([a], [b]) => ((a.c[0] - ll.lng) ** 2 + (a.c[1] - ll.lat) ** 2) - ((b.c[0] - ll.lng) ** 2 + (b.c[1] - ll.lat) ** 2));
+  return { park: named[0][1] };
 };
 map.on("mousemove", e => {
-  const u = waterAt(e.point);
-  if (u === null) { tip.remove(); return; }
-  tip.setLngLat(e.lngLat).setHTML(describeNode(u)).addTo(map);
+  const at = waterAt(e.point);
+  if (!at) { tip.remove(); return; }
+  tip.setLngLat(e.lngLat).setHTML(at.park !== undefined ? describePark(at.park) : describeNode(at.node)).addTo(map);
 });
 map.on("mouseout", () => tip.remove());
 // This runs before index.html's lot click (it is added first), so it can tell selectLot to sit this click out.
 map.on("click", e => {
-  const u = waterAt(e.point);
-  if (u === null) return;
+  const at = waterAt(e.point);
+  if (!at) return;
   water.tookClick = true;
   setTimeout(() => { water.tookClick = false; }, 0);
-  pick({ node: u }, false);
+  pick(at, false);
 });
 const selectLotWithoutWater = selectLot;
 selectLot = function (feature, fly) { if (!water.tookClick) selectLotWithoutWater(feature, fly); };
