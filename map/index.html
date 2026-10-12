@@ -114,7 +114,11 @@ WHERE THE DATA COMES FROM
      a pale sand, a mid slate and a dark violet on the light theme; on the dark one a vivid violet
      (--over-fill, on the map and the lot's bar) sits below both, kept apart by its strength of
      colour, and text stays a lavender, which reads better small. The sand is pale so it doesn't merge with the parks'
-     green for red-green colour-blind viewers. Not-assessed lots are hatched (--hatch), not filled. */
+     green for red-green colour-blind viewers. Not-assessed lots are hatched (--hatch), not filled.
+     Over 75% is also striped (--over-stripe), and parks have a dark-green edge, so neither rests on
+     colour alone. Checked 2026-10-11 by simulating protanopia, deuteranopia and tritanopia
+     (Machado 2009): every pair of colours that meet on the map stays at least 11 apart in OKLab
+     (x100) on the light basemap, and 8 on the dark one; slate and purple are the closest pair. */
   :root {
     --surface: #fbfaf7; --ink: #1c1b18; --ink-2: #54524c; --ink-3: #65635c;
     --rule: #e4e1da; --fill: #efede8; --accent: #2a6fc4;
@@ -123,7 +127,7 @@ WHERE THE DATA COMES FROM
     --sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
     --permeable: #e0c99c; --impermeable: #5f6670; --over: #581c87; --check: #ffbf00; --check-ink: #b45309; --out: #b9b8b2;
-    --roof: #3d3d3a; --hatch: #a3a19a; --over-fill: #581c87;
+    --roof: #3d3d3a; --hatch: #a3a19a; --over-fill: #581c87; --over-stripe: #f5f0ff;
     --pass: #2f7d4f; --fail: #581c87; --on-pill: #fff;
     --row: 44px;
   }
@@ -132,7 +136,7 @@ WHERE THE DATA COMES FROM
       --surface: #1b1a18; --ink: #f2f0eb; --ink-2: #bab7b0; --ink-3: #9c9991;
       --rule: #34322e; --fill: #272522; --accent: #5b9cec;
       --float: 0 0 0 1px rgba(255,255,255,.07), 0 12px 32px -8px rgba(0,0,0,.6); --over: #d8b4fe; --check-ink: #ffbf47; --out: #5a5955;
-      --permeable: #e6cf9f; --impermeable: #9aa3ad; --hatch: #6e6c66; --over-fill: #a855f7;
+      --permeable: #e6cf9f; --impermeable: #9aa3ad; --hatch: #6e6c66; --over-fill: #a855f7; --over-stripe: #1b1a18;
       --roof: #6b6a65; --pass: #5fbf85; --fail: #d8b4fe; --on-pill: #1f1f1d;
     }
   }
@@ -140,7 +144,7 @@ WHERE THE DATA COMES FROM
     --surface: #1b1a18; --ink: #f2f0eb; --ink-2: #bab7b0; --ink-3: #9c9991;
     --rule: #34322e; --fill: #272522; --accent: #5b9cec;
     --float: 0 0 0 1px rgba(255,255,255,.07), 0 12px 32px -8px rgba(0,0,0,.6); --over: #d8b4fe; --check-ink: #ffbf47; --out: #5a5955;
-    --permeable: #e6cf9f; --impermeable: #9aa3ad; --hatch: #6e6c66; --over-fill: #a855f7;
+    --permeable: #e6cf9f; --impermeable: #9aa3ad; --hatch: #6e6c66; --over-fill: #a855f7; --over-stripe: #1b1a18;
     --roof: #6b6a65; --pass: #5fbf85; --fail: #d8b4fe; --on-pill: #1f1f1d;
   }
   html, body { margin: 0; height: 100%; background: var(--surface); color: var(--ink);
@@ -223,7 +227,7 @@ WHERE THE DATA COMES FROM
   .areabar { position: relative; display: flex; height: 16px; border-radius: 5px; background: var(--rule); margin: 14px 0 30px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
   .areabar span { height: 100%; transition: width 250ms ease-out; }
   .areabar span:first-child { border-radius: 5px 0 0 5px; }
-  #barRoof { background: var(--roof); } #barRed { background: var(--impermeable); } #barOver { background: var(--over-fill); } #barBlue { background: var(--permeable); }
+  #barRoof { background: var(--roof); } #barRed { background: var(--impermeable); } #barOver { background: repeating-linear-gradient(45deg, var(--over-stripe) 0 1.5px, var(--over-fill) 1.5px 5px); } #barBlue { background: var(--permeable); }
   .areabar.out { background: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 7px); box-shadow: inset 0 0 0 1px var(--hatch); margin-bottom: 16px; }
   .areabar .mark { position: absolute; top: -3px; width: 1.5px; height: 22px; background: var(--ink); border-radius: 1px; }
   .areabar .mark i, .areabar .ghost i { position: absolute; top: 22px; left: 0; transform: translateX(-50%); font-style: normal;
@@ -396,6 +400,9 @@ WHERE THE DATA COMES FROM
     font-size: 12px; line-height: 16px; color: var(--ink-2); }
   .legend div { display: flex; align-items: center; gap: 6px; }
   .swatch { width: 12px; height: 12px; border-radius: 4px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .swatch.over { background: repeating-linear-gradient(45deg, var(--over-stripe) 0 1.25px, var(--over-fill) 1.25px 4px) !important; }
+  /* "Check" as the map shows it zoomed out: an amber circle with a dark ring. */
+  .swatch.checkdot { border-radius: 50%; background: var(--check) !important; box-shadow: inset 0 0 0 1.5px #17212b; }
   .swatch.outline { box-sizing: border-box; border: 2px solid var(--check); outline: 1px solid var(--ink); background: transparent !important; }
   .swatch.hatch { background: repeating-linear-gradient(135deg, var(--hatch) 0 1.25px, transparent 1.25px 4px) !important; box-shadow: inset 0 0 0 1px var(--hatch); }
   .swatch.dot { border-radius: 50%; }
@@ -619,7 +626,7 @@ const STORM_DEFAULTS = { runoff: STORM.runoff, soil_mm: STORM.soil_mm };
 // dark basemap) differs in lightness, not only in hue, so they hold for colour-blind viewers
 // (see the note on the colours above). Keep these equal to the CSS variables.
 const COLOR = { permeable: "#e0c99c", permeableDark: "#e6cf9f", impermeable: "#5f6670", impermeableDark: "#9aa3ad",
-                over: "#581c87", overDark: "#a855f7", check: "#ffbf00", hatch: "#a3a19a", hatchDark: "#6e6c66",
+                over: "#581c87", overDark: "#a855f7", overStripe: "#f5f0ff", overStripeDark: "#1b1a18", check: "#ffbf00", hatch: "#a3a19a", hatchDark: "#6e6c66",
                 out: "#b9b8b2", roof: "#3d3d3a", roofDark: "#6b6a65", park: "#3f9a4a", parkDark: "#4f9a5a",
                 garden: "#c3e88d", gardenEdge: "#1d4d24", basin: "#17212b", basinDark: "#e8eef5" };
 const BASINS_MIN_ZOOM = 15;           // catch basins are drawn from this zoom in
@@ -785,11 +792,11 @@ const sw = c => `<span class="swatch" style="background:${c}"></span>`;
 $("mapLegend").innerHTML = [
   [sw(PERM), "Permeable"],
   [sw(IMP), "Impermeable"],
-  [sw(OVER), `Over ${L * 100}%`],
-  [`<span class="swatch outline"></span>`, `Check: roof over ${B.building_limit * 100}%`],
+  [`<span class="swatch over"></span>`, `Over ${L * 100}% (striped)`],
+  [`<span class="swatch checkdot"></span>`, `Check: roof over ${B.building_limit * 100}%`],
   [`<span class="swatch picked"></span>`, "Selected lot"],
   [`<span class="swatch hatch"></span>`, "Not assessed"],
-  [sw(COLOR.park), "Park"],
+  [`<span class="swatch" style="background:${dark ? COLOR.parkDark : COLOR.park};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Park"],
   [`<span class="swatch dot" style="background:${COLOR.garden};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Community garden"],
   [`<span class="swatch dot small-dot" style="background:${dark ? COLOR.basinDark : COLOR.basin}"></span>`, "Catch basin"],
   [sw(dark ? VIEW_3D.assumedDark : VIEW_3D.assumed), "Height assumed", "legend3d"],     // 3D only
@@ -968,7 +975,7 @@ const LOT_SHADER = {
   fragment: `
     precision highp float;
     uniform float u_hard, u_scenario, u_limit, u_opacity, u_sel, u_selShare, u_px;
-    uniform vec3 u_permeable, u_impermeable, u_over, u_out;
+    uniform vec3 u_permeable, u_impermeable, u_over, u_out, u_overStripe;
     varying float v_y, v_sc, v_roof, v_A, v_id;
     void main() {
       vec3 c;
@@ -982,6 +989,9 @@ const LOT_SHADER = {
         c = v_y >= 1.0 - u_limit ? (v_y >= 1.0 - hard ? u_impermeable : u_permeable)
           : (v_y >= 1.0 - hard ? u_over : u_permeable);
       else c = v_roof > u_limit + 1e-6 ? u_over : (v_y >= 1.0 - v_roof ? u_impermeable : u_permeable);
+      // Over 75% is striped as well as purple, so it never rests on colour alone: thin lines
+      // across the hatching's direction, in the page's surface colour.
+      if (c == u_over && mod(gl_FragCoord.x + gl_FragCoord.y, 6.0 * u_px) < 1.75 * u_px) c = u_overStripe;
       gl_FragColor = vec4(c * u_opacity, u_opacity);
     }`,
 };
@@ -1051,7 +1061,7 @@ function lotLayer(mesh) {
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_px", "u_permeable", "u_impermeable", "u_over", "u_out", "u_zscale", "u_zoff"])
+      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_px", "u_permeable", "u_impermeable", "u_over", "u_out", "u_overStripe", "u_zscale", "u_zoff"])
         loc[u] = gl.getUniformLocation(prog, u);
       vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
       this.bindVAO(vao);
@@ -1082,6 +1092,7 @@ function lotLayer(mesh) {
       gl.uniform3fv(loc.u_impermeable, hexToRGB(IMP));
       gl.uniform3fv(loc.u_over, hexToRGB(OVER));
       gl.uniform3fv(loc.u_out, hexToRGB(dark ? COLOR.hatchDark : COLOR.hatch));
+      gl.uniform3fv(loc.u_overStripe, hexToRGB(dark ? COLOR.overStripeDark : COLOR.overStripe));
       gl.uniform1f(loc.u_zscale, state.view3d ? Z_PER_METRE : 0);
       gl.uniform1f(loc.u_zoff, state.view3d ? map.transform.elevation : 0);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
@@ -1642,7 +1653,7 @@ function cityUpdate() {
     : atMax
       ? `The by-law maximum: every lot is at its limit and passes.` + (over ? ` ${int(over)} ${over === 1 ? "house doesn't fit: its roofs alone are" : "houses don't fit: their roofs alone are"} over ${L * 100}%.` : "")
       : past
-        ? `Past the limit: every lot fails by ${+(hardPct - L * 100).toFixed(1)}% of its site, the purple stripe.`
+        ? `Past the limit: every lot fails by ${+(hardPct - L * 100).toFixed(1)}% of its site, the striped purple band.`
         : `A house shows once its roofs fit within ${hardPct}% of its lot.`;
   slider.setAttribute("aria-valuetext", `${hardPct} percent impermeable on every lot; ` +
     (past ? `every lot is over ${L * 100} percent` : `${int(shown)} of ${int(n)} lots fit`));
@@ -2014,6 +2025,9 @@ map.on("load", async () => {
   map.addSource("parks", { type: "geojson", data: PARKS_FILE });
   map.addLayer({ id: "parks", type: "fill", source: "parks",
     paint: { "fill-color": dark ? COLOR.parkDark : COLOR.park, "fill-opacity": dark ? 0.7 : 0.8 } }, firstLabel);
+  // A thin dark-green edge, so a park reads by its outline as well as its colour.
+  map.addLayer({ id: "park-edges", type: "line", source: "parks", minzoom: 11,
+    paint: { "line-color": dark ? "#9fd3a5" : COLOR.gardenEdge, "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.5, 16, 1.5], "line-opacity": 0.8 } }, firstLabel);
   map.addLayer({ id: "park-labels", type: "symbol", source: "parks", minzoom: 14,
     layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Bold"], "text-size": 12, "symbol-placement": "point" },
     paint: { "text-color": dark ? "#cfe8cf" : "#1d4d24", "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
