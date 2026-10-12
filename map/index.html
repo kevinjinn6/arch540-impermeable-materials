@@ -890,7 +890,8 @@ function renderRainCity() {
   $("noteStorm").textContent = `Storm card: ${STORM.rainfall_mm} mm is the ${STORM.policy} design standard, not a by-law. ` +
     `Held = min[rain on permeable ground + ${num(STORM.runoff * 100)}% of rain on hard surfaces, ${num(STORM.soil_mm)} mm × permeable area]; the rest overflows.` +
     (stormEdited() ? ` (Changed on this page; the defaults are ${STORM_DEFAULTS.runoff * 100}% and ${STORM_DEFAULTS.soil_mm} mm.)` : "");
-  $("noteRainCity").textContent = `Rain City point (${RC_POLICY}): ${rainCityFormula(rc)}`;
+  $("noteRainCity").textContent = `Rain City point (${RC_POLICY}): ${rainCityFormula(rc)} ` +
+    `"On site" means nothing reaches the storm sewer: the ${num(100 - STORM.runoff * 100)}% of rain on hard surfaces that does not run off stays where it falls, and counts as on site.`;
   renderHist();
 }
 // The two fields: a number in range changes the storm everywhere at once; anything else is
@@ -1305,6 +1306,13 @@ $("handle").addEventListener("click", () => {
   panel.dataset.sheet = full ? "full" : "peek";
   $("handle").setAttribute("aria-label", full ? "Collapse the panel" : "Expand the panel");
 });
+// On a desktop the panel stops above the legend, so a long panel scrolls instead of covering it.
+function fitPanelAboveLegend() {
+  const lg = $("mapLegend");
+  panel.style.maxHeight = innerWidth > 560 && lg.offsetHeight ? `calc(100% - ${24 + 12 + lg.offsetHeight}px)` : "";
+}
+new ResizeObserver(fitPanelAboveLegend).observe($("mapLegend"));
+addEventListener("resize", fitPanelAboveLegend);
 $("legendBtn").addEventListener("click", () => {
   const open = $("mapLegend").classList.toggle("open");
   $("legendBtn").setAttribute("aria-expanded", String(open));
