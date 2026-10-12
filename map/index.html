@@ -607,6 +607,11 @@ function assess(lot, added, counts) {
   };
 }
 
+// The slider share at which a lot's house appears in Every lot: its roof share to the walls,
+// at least 1% (so a shed the eave allowance shrinks to nothing still waits for the slider),
+// and 0 for a lot with no 2015 roof. The roofs layer uses the same floor.
+const roofShareShown = p => p.r > 0 ? Math.min(1, Math.max(p.rw / p.A, 0.01)) : 0;
+
 // A schedule of surfaces for one lot: [{id, m2}] -> totals by class.
 function sumSchedule(rows) {
   let imp = 0, perm = 0, pavers = 0;
@@ -689,6 +694,7 @@ $("mapLegend").innerHTML = [
   `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
 $("notes").innerHTML = [
   `Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.`,
+  `<span id="noteNoRoof">Every figure counts the same lots: every assessed R1-1 lot.</span>`,
   `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m², flagged parcels and park land with no building are hatched: not assessed.`,
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
   `Paving is in no City dataset: the schedule and the slider are hypotheses you set. Not a compliance finding; a reviewer measures from a survey.`,
@@ -1304,7 +1310,7 @@ function renderPeek() {
     const c = state.city;
     el.innerHTML = c ? `<div class="peek-row"><span class="addr">${Math.round(state.hard * 100)}% impermeable</span>` +
       (state.hard > L + 1e-9 ? `<span class="caption over">every lot over ${L * 100}%</span></div>`
-        : `<span class="caption">${int(c.shown)} of ${int(c.houses)} houses fit</span></div>`) : `<span class="caption">Loading…</span>`;
+        : `<span class="caption">${int(c.shown)} of ${int(c.n)} lots fit</span></div>`) : `<span class="caption">Loading…</span>`;
     return;
   }
   const lot = state.selected;
@@ -1409,38 +1415,39 @@ function cityUpdate() {
   if (!state.assessed.length) return;
   const n = state.assessed.length;
   const hardPct = Math.round(state.hard * 100), atMax = Math.abs(state.hard - L) < 1e-9, past = state.hard > L + 1e-9;
-  let houses = 0, shown = 0, over = 0;
+  // One count everywhere: every assessed lot (n). A lot fits once the slider reaches its roof
+  // share; a lot with no 2015 roof (state.noRoof of them) fits from 0%.
+  let shown = 0, over = 0;
   const totals = { rainM3: 0, heldM3: 0, sewerM3: 0, surfaceM3: 0 };
   for (const p of state.assessed) {
-    const roof = p.rw / p.A;
-    if (p.r > 0) { houses++; if (Math.max(roof, 0.01) <= state.hard + 1e-9) shown++; }   // the same 1% floor as the roofs layer
-    if (roof > L + 1e-9) over++;
+    if (roofShareShown(p) <= state.hard + 1e-9) shown++;
+    if (p.rw / p.A > L + 1e-9) over++;
     const w = waterBalance(p.A, state.hard);
     for (const k in totals) totals[k] += w[k];
   }
-  state.city = { shown, houses, over, n };
+  state.city = { shown, over, n };
   $("addedReadout").textContent = `${hardPct}%`;
   $("addedReadout").className = past ? "over" : "";
   $("addedMat").textContent = `impermeable, ${100 - hardPct}% permeable, on every lot`;
   $("cityHero").innerHTML = past
     ? `<span class="display over">${int(n)}</span><span>of ${int(n)} lots over ${L * 100}% <span class="caption">· every lot fails</span></span>`
     : `<span class="display">${int(shown)}</span>` +
-    `<span>of ${int(houses)} houses fit in ${hardPct}% <span class="caption">· ${(shown / houses * 100).toFixed(1)}%</span></span>`;
+    `<span>of ${int(n)} lots fit in ${hardPct}% <span class="caption">· ${(shown / n * 100).toFixed(1)}%</span></span>`;
   $("cityHint").innerHTML = hardPct === 0
-    ? `An empty lot: all permeable. Drag right; each house appears when the slider reaches its roof share.`
+    ? `An empty lot: all permeable. The ${int(state.noRoof)} that fit have no roof in the 2015 air photo. Drag right; each house appears when the slider reaches its roof share.`
     : atMax
       ? `The by-law maximum: every lot is at its limit and passes.` + (over ? ` ${int(over)} ${over === 1 ? "house doesn't fit: its roofs alone are" : "houses don't fit: their roofs alone are"} over ${L * 100}%.` : "")
       : past
         ? `Past the limit: every lot fails by ${hardPct - L * 100}% of its site, the purple stripe.`
         : `A house shows once its roofs fit within ${hardPct}% of its lot.`;
   slider.setAttribute("aria-valuetext", `${hardPct} percent impermeable on every lot; ` +
-    (past ? `every lot is over ${L * 100} percent` : `${int(shown)} of ${int(houses)} houses fit`));
+    (past ? `every lot is over ${L * 100} percent` : `${int(shown)} of ${int(n)} lots fit`));
   $("checkSummary").innerHTML = `<b class="check">${int(state.count50wall)}</b> roofs over ${B.building_limit * 100}% <span class="caption">· check</span>`;
   $("checkBody").textContent = `${int(state.count50edge)} to the roof edge; the ${EAVE_M} m eave allowance leaves ${int(state.count50wall)}. ` +
     `The air photo cannot say which is right, so these sites are outlined in amber as "check", never "exceedance".`;
   const share = k => totals.rainM3 > 0 ? totals[k] / totals.rainM3 * 100 : 0;
   $("waterSummary").innerHTML = `${STORM.rainfall_mm} mm storm <span class="caption">· ${Math.round(share("heldM3"))}% soaks in</span>`;
-  $("waterTitle").textContent = `${STORM.rainfall_mm} mm storm, every lot as set above`;
+  $("waterTitle").textContent = `${STORM.rainfall_mm} mm storm on all ${int(n)} lots, each as set above`;
   $("barHeld").style.width = `${share("heldM3")}%`;
   $("barSewer").style.width = `${share("sewerM3")}%`;
   $("barSurface").style.width = `${share("surfaceM3")}%`;
@@ -1606,6 +1613,10 @@ map.on("load", async () => {
   state.assessed = data.features.filter(f => f.properties.assessed).map(f => f.properties);
   state.count50edge = state.assessed.filter(p => p.r > BYLAW.building_limit * p.A + 1e-9).length;
   state.count50wall = state.assessed.filter(p => p.rw > BYLAW.building_limit * p.A + 1e-9).length;
+  state.noRoof = state.assessed.filter(p => !(p.r > 0)).length;
+  $("noteNoRoof").textContent = `Every figure counts the same ${int(state.assessed.length)} assessed lots. ` +
+    `${int(state.noRoof)} of them (${(state.noRoof / state.assessed.length * 100).toFixed(1)}%) have no roof in the 2015 footprints: ` +
+    `empty, or between a teardown and a new house, when the photo was taken. They count as 0% roofs, so they fit at every slider setting; a house built on them since is missing.`;
 
   map.addSource("lots", { type: "geojson", data });
   map.getStyle().layers.filter(l => l["source-layer"] === "building")
