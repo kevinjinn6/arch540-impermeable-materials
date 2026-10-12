@@ -318,6 +318,25 @@ WHERE THE DATA COMES FROM
   .stops .limit { position: absolute; top: 0; transform: translateX(-50%); color: var(--ink); white-space: nowrap; }
   /* The by-law maximum on the track: past it, every lot's extra share is a purple stripe. */
   .limit-mark { position: absolute; top: 26px; width: 2px; height: 12px; background: var(--ink); transform: translateX(-1px); border-radius: 1px; pointer-events: none; }
+  /* The Rain City point (not the by-law): a line under the count, a blue mark on the track and a
+     label under it that moves the slider there. Blue, the colour kept for water. */
+  .rc { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--fill); }
+  .rc b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rc-policy { margin-top: 2px; }
+  .rc-edit { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .rc-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  .rc-fields label { display: inline-flex; align-items: center; gap: 6px; }
+  .rc-fields input { width: 56px; height: 32px; border: 0; border-radius: 8px; background: var(--surface); text-align: right; padding: 0 8px;
+    font: inherit; color: var(--ink); font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 1px var(--rule); }
+  .rc-fields input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .rc-fields input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--fail); }
+  .rc-mark { position: absolute; top: 24px; width: 2px; height: 16px; background: var(--accent); transform: translateX(-1px); border-radius: 1px; pointer-events: none; }
+  .rc-stops { position: relative; height: 22px; margin-top: 2px; }
+  .rc-stop { position: absolute; top: 0; border: 0; background: transparent; padding: 2px 0; font: inherit; font-size: 12px; line-height: 16px;
+    color: var(--accent); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rc-stop::before { content: "▲ "; font-size: 9px; }
+  .rc-stop:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .rc-stop.c { transform: translateX(-50%); } .rc-stop.l { transform: translateX(-6px); } .rc-stop.r { transform: translateX(calc(-100% + 6px)); }
   #cityHint { margin: 8px 0 0; }
   .tag { display: inline-block; font-size: 12px; line-height: 16px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; margin-bottom: 6px; }
@@ -416,14 +435,29 @@ WHERE THE DATA COMES FROM
 
     <section id="modeCity" role="tabpanel" aria-labelledby="tabCity">
       <div id="cityHero" aria-live="polite"></div>
+      <!-- The Rain City point: the share at which a lot keeps the storm on site. Not the by-law. -->
+      <div class="rc" id="rc">
+        <div id="rcLine"></div>
+        <div class="caption rc-policy"><span id="rcPolicy"></span> · <button type="button" class="linkbtn caption" id="rcEditBtn" aria-expanded="false" aria-controls="rcEdit"></button></div>
+        <div class="rc-edit" id="rcEdit" hidden>
+          <div class="rc-fields">
+            <label>Runoff <input id="rcRunoff" type="number" min="0" max="100" step="1" inputmode="decimal" aria-label="Share of rain that runs off hard surfaces, percent"> %</label>
+            <label>Soil holds <input id="rcSoil" type="number" min="0" max="1000" step="1" inputmode="decimal" aria-label="Water the permeable ground holds, millimetres"> mm</label>
+            <button type="button" class="linkbtn caption" id="rcReset" hidden>Reset to defaults</button>
+          </div>
+          <div class="caption" id="rcFormula"></div>
+        </div>
+      </div>
       <div class="added"><b id="addedReadout">0%</b><span id="addedMat"></span></div>
       <div class="track">
         <div class="tick c" id="roomTick" hidden aria-hidden="true"><span id="roomTickLabel"></span></div>
         <div class="limit-mark" id="limitMark" aria-hidden="true"></div>
+        <div class="rc-mark" id="rcMark" hidden aria-hidden="true"></div>
         <input type="range" id="slider" min="0" max="75" step="1" value="0" disabled
                aria-label="Impermeable share of every lot, in percent">
       </div>
       <div class="stops"><span>0% · empty lot</span><span class="limit" id="limitStop"></span><span>100%</span></div>
+      <div class="rc-stops"><button type="button" class="rc-stop c" id="rcStop" hidden></button></div>
       <p class="caption" id="cityHint"></p>
       <div class="rows">
         <details class="row" id="checkRow"><summary><span id="checkSummary"></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary><div class="caption pad" id="checkBody"></div></details>
@@ -525,6 +559,9 @@ const STORM = {
   soil_mm: 75,         // mm of water the permeable ground holds (good soil; this page's assumption)
   pool_m3: 2500,       // one Olympic pool, for scale
 };
+// The reader can change runoff and soil storage on the page ("Every lot", under the Rain City
+// line); these are the values "Reset to defaults" puts back.
+const STORM_DEFAULTS = { runoff: STORM.runoff, soil_mm: STORM.soil_mm };
 
 // ---- Colours for the lots (CSS variables above hold the panel's) ------------
 // sand = permeable, slate = impermeable (growing from the south edge of each lot, as a diagram),
@@ -634,6 +671,21 @@ function waterBalance(areaM2, hardShare) {
   const heldM3 = Math.min(reachingM3, D * perm / 1000);
   return { rainM3, heldM3, sewerM3: reachingM3 - heldM3, surfaceM3: rainM3 - reachingM3 };
 }
+// The Rain City point: the impermeable share h at which a lot keeps the storm card's storm
+// entirely on site (nothing to the storm sewer), from waterBalance above. Nothing overflows
+// while the rain reaching the soil is no more than the soil holds:
+//     P × (1 − h)  +  C × P × h   ≤   D × (1 − h)
+//     rain on the     runoff from     what the
+//     soil itself     hard surfaces   soil holds
+// so  h = (D − P) ÷ (D − P + C × P). The lot's area is on both sides and cancels out, so the
+// share is the same on every lot. kind: "share" (0 < h < 1), "all" (no runoff: any share),
+// "zero" (the soil holds exactly the rain: only an all-permeable lot), "none" (it holds less).
+function rainCityShare(P = STORM.rainfall_mm, C = STORM.runoff, D = STORM.soil_mm) {
+  if (D < P) return { kind: "none", share: null };
+  if (C <= 0) return { kind: "all", share: 1 };
+  if (D === P) return { kind: "zero", share: 0 };
+  return { kind: "share", share: (D - P) / (D - P + C * P) };
+}
 // ---- END PURE -----------------------------------------------------------------
 
 
@@ -699,13 +751,90 @@ $("notes").innerHTML = [
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
   `Paving is in no City dataset: the schedule and the slider are hypotheses you set. Not a compliance finding; a reviewer measures from a survey.`,
   `At exactly ${L * 100}% a lot passes. Colours use unrounded areas.`,
-  `Storm card: ${STORM.rainfall_mm} mm is the ${STORM.policy} design standard, not a by-law. Held = min[rain on permeable ground + ${Math.round(STORM.runoff * 100)}% of rain on hard surfaces, ${STORM.soil_mm} mm × permeable area]; the rest overflows.`,
+  `<span id="noteStorm"></span>`,
+  `<span id="noteRainCity"></span>`,
 ].map(n => `<li>${n}</li>`).join("");
 $("footer").innerHTML =
   `<a href="${B.schedule_url}" target="_blank" rel="noopener">R1-1 District Schedule</a> (${B.consolidation}: s.3.2.2.7–8 p.12, s.4.2.2 p.16) · ` +
   `<a href="${B.section2_url}" target="_blank" rel="noopener">Section 2</a> (p.20, p.31, p.43, p.11) · City of Vancouver open data · ` +
   `<a href="${B.repo_url}" target="_blank" rel="noopener">Repository</a>: pipeline, Rhino script, tests, source extract · ${VERSION}`;
 $("waterPolicy").textContent = `${STORM.policy.replace(" (2019), a Council policy", ", a Council policy")} · not the by-law`;
+const RC_POLICY = `${STORM.policy}, not the by-law`;    // "Rain City Strategy (2019), a Council policy, not the by-law"
+$("rcPolicy").textContent = RC_POLICY;
+
+// ---- The Rain City point and the two storm assumptions the reader can change ------------
+const pctTxt = h => `${+(h * 100).toFixed(1)}%`;            // 0.4 -> "40%", 0.398 -> "39.8%"
+const num = x => +x.toFixed(2);                              // 0.85 -> 0.85, 75 -> 75
+const stormEdited = () => STORM.runoff !== STORM_DEFAULTS.runoff || STORM.soil_mm !== STORM_DEFAULTS.soil_mm;
+// The sentence for the Every-lot headline, for each kind of answer (see rainCityShare).
+function rainCitySentence(rc) {
+  const P = STORM.rainfall_mm, D = num(STORM.soil_mm), law = `the by-law allows ${L * 100}%`;
+  if (rc.kind === "share") return `Manages ${P} mm on site up to <b>${pct(rc.share)}</b> impermeable · ${law}.`;
+  if (rc.kind === "all") return `Manages ${P} mm on site at any share, even 100% impermeable: with 0% runoff the hard surfaces shed nothing · ${law}.`;
+  if (rc.kind === "zero") return `Manages ${P} mm on site only with no hard surface at all (0%): the soil holds exactly ${D} mm · ${law}.`;
+  return `No lot manages ${P} mm on site, even all permeable: the soil holds ${D} mm, less than the ${P} mm that falls on it · ${law}.`;
+}
+// The working, in the reader's numbers.
+function rainCityFormula(rc) {
+  const P = STORM.rainfall_mm, C = num(STORM.runoff), D = num(STORM.soil_mm);
+  const rule = `Nothing goes to the sewer while ${P} × (1 − h) + ${C} × ${P} × h ≤ ${D} × (1 − h): rain on the soil, plus runoff from hard surfaces, within what the soil holds.`;
+  if (rc.kind === "share") return `${rule} So h = (${D} − ${P}) ÷ (${D} − ${P} + ${C} × ${P}) = ${pct(rc.share)}. The lot's area cancels out, so it is the same on every lot.`;
+  if (rc.kind === "all") return `${rule} With no runoff the left side is never more than the right, whatever h is.`;
+  return `${rule} With ${D} mm of soil and ${P} mm of rain it holds only at h = 0` + (rc.kind === "none" ? `, and not even there.` : `.`);
+}
+function renderRainCity() {
+  const rc = rainCityShare();
+  state.rc = rc;
+  $("rcLine").innerHTML = rainCitySentence(rc);
+  $("rcEditBtn").textContent = `${num(STORM.runoff * 100)}% runoff · ${num(STORM.soil_mm)} mm soil`;
+  $("rcFormula").textContent = rainCityFormula(rc);
+  $("rcReset").hidden = !stormEdited();
+  // The mark on the track and the label under it, on the thumb's scale (see updateTick).
+  const mark = $("rcMark"), stop = $("rcStop"), f = rc.share;
+  mark.hidden = stop.hidden = f === null;
+  if (f !== null) {
+    const at = `calc(${THUMB_PX / 2}px + (100% - ${THUMB_PX}px) * ${f.toFixed(4)})`;
+    mark.style.left = stop.style.left = at;
+    stop.className = "rc-stop " + (f < 0.25 ? "l" : f > 0.75 ? "r" : "c");
+    stop.textContent = `${pctTxt(f)} · ${STORM.rainfall_mm} mm on site · not the by-law`;
+    stop.title = `Move the slider to ${pct(f)}: where a lot keeps the ${STORM.rainfall_mm} mm storm on site. ${RC_POLICY}.`;
+    stop.setAttribute("aria-label", stop.title);
+  }
+  $("noteStorm").textContent = `Storm card: ${STORM.rainfall_mm} mm is the ${STORM.policy} design standard, not a by-law. ` +
+    `Held = min[rain on permeable ground + ${num(STORM.runoff * 100)}% of rain on hard surfaces, ${num(STORM.soil_mm)} mm × permeable area]; the rest overflows.` +
+    (stormEdited() ? ` (Changed on this page; the defaults are ${STORM_DEFAULTS.runoff * 100}% and ${STORM_DEFAULTS.soil_mm} mm.)` : "");
+  $("noteRainCity").textContent = `Rain City point (${RC_POLICY}): ${rainCityFormula(rc)}`;
+}
+// The two fields: a number in range changes the storm everywhere at once; anything else is
+// marked and ignored until it is fixed.
+function readStormFields() {
+  const C = Number($("rcRunoff").value), D = Number($("rcSoil").value);
+  const okC = $("rcRunoff").value !== "" && C >= 0 && C <= 100, okD = $("rcSoil").value !== "" && D >= 0 && D <= 1000;
+  $("rcRunoff").setAttribute("aria-invalid", String(!okC)); $("rcSoil").setAttribute("aria-invalid", String(!okD));
+  if (okC) STORM.runoff = C / 100;
+  if (okD) STORM.soil_mm = D;
+  stormChanged();
+}
+function fillStormFields() { $("rcRunoff").value = num(STORM.runoff * 100); $("rcSoil").value = num(STORM.soil_mm);
+  for (const id of ["rcRunoff", "rcSoil"]) $(id).setAttribute("aria-invalid", "false"); }
+// Everything that reads the storm follows: this line, the storm card, the lot card, the Water card.
+function stormChanged() { renderRainCity(); if (state.ready) slider.dispatchEvent(new Event("input")); }
+$("rcRunoff").addEventListener("input", readStormFields);
+$("rcSoil").addEventListener("input", readStormFields);
+$("rcReset").addEventListener("click", () => { Object.assign(STORM, STORM_DEFAULTS); fillStormFields(); stormChanged(); });
+$("rcEditBtn").addEventListener("click", () => {
+  const open = $("rcEdit").hidden; $("rcEdit").hidden = !open;
+  $("rcEditBtn").setAttribute("aria-expanded", String(open));
+  if (open) $("rcRunoff").focus();
+});
+// The label under the track moves the slider exactly onto the point; the slider's next drag or
+// key press goes back to whole percents.
+$("rcStop").addEventListener("click", () => { if (state.ready && state.rc.share !== null) setSliderShare(state.rc.share); });
+function setSliderShare(h) {
+  slider.step = "any"; slider.value = String(h * 100);
+  slider.dispatchEvent(new Event("input"));
+}
+for (const ev of ["pointerdown", "keydown"]) slider.addEventListener(ev, () => { if (slider.step !== "1") slider.step = "1"; });
 for (const [id, c] of [["barHeld", PERM], ["barSewer", OVER], ["barSurface", COLOR.out]]) $(id).style.background = c;
 const skeleton = () => `<div class="skel" aria-hidden="true"><span style="width:56%;height:20px"></span><span></span><span style="width:44%;height:28px"></span><span style="margin-top:8px"></span><span style="width:84%"></span></div>` +
   `<p class="caption" style="margin:20px 0 0">Loading 62,000 lots (17 MB)…</p>`;
@@ -1183,7 +1312,7 @@ function renderLot() {
   html += `<div class="fact-row total"><span>Roofs + paving</span><span class="num" id="totalOut"></span></div>`;
   html += `<div class="rows">` +
     `<details class="row"><summary>Check the arithmetic${CHEV}</summary><div class="hand" id="handCheck"></div></details>` +
-    `<details class="row"><summary><span>Storm <span class="caption">· Council policy, not the by-law</span></span>${CHEV}</summary><div class="caption pad" id="lotStorm"></div></details>` +
+    `<details class="row"><summary><span class="two"><span>Storm <span class="caption" id="lotStormSum"></span></span><span class="caption">${RC_POLICY}</span></span>${CHEV}</summary><div class="caption pad" id="lotStorm"></div></details>` +
     `<details class="row"><summary>Draw it in Rhino${CHEV}</summary><div class="caption pad">Set ADDRESSES to “${p.ad}” in <code>map/rhino_site.py</code> and run it in Rhino. It draws the site, its 2015 roofs and this bar.</div></details>` +
     `</div>`;
   // A rebuild of the same lot keeps whatever the reader had opened.
@@ -1283,8 +1412,22 @@ function renderLotTotals() {
     [`= ${spare < -1e-9 ? "over" : "spare"}`, Math.abs(spare).toFixed(2), over ? "FAIL" : "PASS"],
   ].map(([a, b, c]) => `<span>${a}</span><b>${b}</b><span>${c}</span>`).join("");
   const w = waterBalance(s.A, share);
-  $("lotStorm").textContent = `In a ${STORM.rainfall_mm} mm storm this lot soaks in ${roundNice(w.heldM3 * 1000)} L and sends ${roundNice(w.sewerM3 * 1000)} L to the storm sewer ` +
-    `(${Math.round(STORM.runoff * 100)}% runoff, ${STORM.soil_mm} mm soil). ${STORM.policy}; R1-1 has no retention rule.`;
+  // The Rain City point is a share, the same on every lot (the area cancels out), so the card
+  // says so once and gives what it means here: square metres of hard surface on this site.
+  const rc = rainCityShare(), P = STORM.rainfall_mm;
+  let rcText;
+  if (rc.kind === "none") {
+    $("lotStormSum").textContent = `· ${P} mm can't stay on site`;
+    rcText = `No lot keeps ${P} mm on site with these assumptions, even all permeable: the soil holds ${num(STORM.soil_mm)} mm.`;
+  } else {
+    const fits = share <= rc.share + 1e-9, room = rc.share * s.A;
+    $("lotStormSum").textContent = `· ${fits ? "on site" : "overflows"}: ${pct(share)} against ${pct(rc.share)}`;
+    rcText = `Every lot keeps ${P} mm on site up to ${pct(rc.share)} impermeable: the same share whatever the lot's size, ` +
+      `because its area cancels out. On this site that is ${m2(room)} of hard surface; roofs and paving come to ${m2(total)}, ` +
+      (fits ? `${m2(room - total)} under it.` : `${m2(total - room)} over it.`);
+  }
+  $("lotStorm").textContent = `${rcText} In a ${P} mm storm this lot soaks in ${roundNice(w.heldM3 * 1000)} L and sends ${roundNice(w.sewerM3 * 1000)} L to the storm sewer ` +
+    `(${num(STORM.runoff * 100)}% runoff, ${num(STORM.soil_mm)} mm soil). ${STORM.policy}; R1-1 has no retention rule.`;
   state.lotResult = { s, t, total, share, overBy, over };
   updateTick(s); renderChip(); renderPeek();
   if (state.ready) map.triggerRepaint();     // the selected lot on the map follows its bar
@@ -1308,7 +1451,7 @@ function renderPeek() {
   const el = $("peek");
   if (state.mode === "city") {
     const c = state.city;
-    el.innerHTML = c ? `<div class="peek-row"><span class="addr">${Math.round(state.hard * 100)}% impermeable</span>` +
+    el.innerHTML = c ? `<div class="peek-row"><span class="addr">${pctTxt(state.hard)} impermeable</span>` +
       (state.hard > L + 1e-9 ? `<span class="caption over">every lot over ${L * 100}%</span></div>`
         : `<span class="caption">${int(c.shown)} of ${int(c.n)} lots fit</span></div>`) : `<span class="caption">Loading…</span>`;
     return;
@@ -1414,7 +1557,7 @@ addrClear.addEventListener("click", () => { addr.value = ""; addrList.innerHTML 
 function cityUpdate() {
   if (!state.assessed.length) return;
   const n = state.assessed.length;
-  const hardPct = Math.round(state.hard * 100), atMax = Math.abs(state.hard - L) < 1e-9, past = state.hard > L + 1e-9;
+  const hardPct = +(state.hard * 100).toFixed(1), atMax = Math.abs(state.hard - L) < 1e-9, past = state.hard > L + 1e-9;
   // One count everywhere: every assessed lot (n). A lot fits once the slider reaches its roof
   // share; a lot with no 2015 roof (state.noRoof of them) fits from 0%.
   let shown = 0, over = 0;
@@ -1428,7 +1571,7 @@ function cityUpdate() {
   state.city = { shown, over, n };
   $("addedReadout").textContent = `${hardPct}%`;
   $("addedReadout").className = past ? "over" : "";
-  $("addedMat").textContent = `impermeable, ${100 - hardPct}% permeable, on every lot`;
+  $("addedMat").textContent = `impermeable, ${+(100 - hardPct).toFixed(1)}% permeable, on every lot`;
   $("cityHero").innerHTML = past
     ? `<span class="display over">${int(n)}</span><span>of ${int(n)} lots over ${L * 100}% <span class="caption">· every lot fails</span></span>`
     : `<span class="display">${int(shown)}</span>` +
@@ -1438,7 +1581,7 @@ function cityUpdate() {
     : atMax
       ? `The by-law maximum: every lot is at its limit and passes.` + (over ? ` ${int(over)} ${over === 1 ? "house doesn't fit: its roofs alone are" : "houses don't fit: their roofs alone are"} over ${L * 100}%.` : "")
       : past
-        ? `Past the limit: every lot fails by ${hardPct - L * 100}% of its site, the purple stripe.`
+        ? `Past the limit: every lot fails by ${+(hardPct - L * 100).toFixed(1)}% of its site, the purple stripe.`
         : `A house shows once its roofs fit within ${hardPct}% of its lot.`;
   slider.setAttribute("aria-valuetext", `${hardPct} percent impermeable on every lot; ` +
     (past ? `every lot is over ${L * 100} percent` : `${int(shown)} of ${int(n)} lots fit`));
@@ -1456,11 +1599,13 @@ function cityUpdate() {
     (totals.sewerM3 < 1 ? `nothing to the storm sewer`
       : `<b>${roundNice(totals.sewerM3)} m³</b> to the storm sewer, about ${(totals.sewerM3 / STORM.pool_m3).toFixed(0)} Olympic pools`);
   $("waterNote").textContent =
-    `${STORM.policy}. R1-1 has no retention rule. Assumes ${Math.round(STORM.runoff * 100)}% runoff and ${STORM.soil_mm} mm of soil storage.`;
+    `${STORM.policy}. R1-1 has no retention rule. Assumes ${num(STORM.runoff * 100)}% runoff and ${num(STORM.soil_mm)} mm of soil storage` +
+    (state.rc && state.rc.share !== null ? `; nothing reaches the sewer up to ${pct(state.rc.share)}.` : `.`);
   renderLotTotals();
   map.triggerRepaint();
 }
 slider.addEventListener("input", () => { state.hard = +slider.value / 100; cityUpdate(); syncBuildings3D(); });
+fillStormFields(); renderRainCity();
 
 renderPeek();                                       // the phone's peek row says "Loading…" until the data arrives
 
