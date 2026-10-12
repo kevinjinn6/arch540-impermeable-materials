@@ -907,7 +907,12 @@ function readStormFields() {
 function fillStormFields() { $("rcRunoff").value = num(STORM.runoff * 100); $("rcSoil").value = num(STORM.soil_mm);
   for (const id of ["rcRunoff", "rcSoil"]) $(id).setAttribute("aria-invalid", "false"); }
 // Everything that reads the storm follows: this line, the storm card, the lot card, the Water card.
-function stormChanged() { renderRainCity(); if (state.ready) slider.dispatchEvent(new Event("input")); }
+function stormChanged() {
+  renderRainCity();
+  // water.js keeps each storm's flood curve once worked out; it depends on these two numbers.
+  if (typeof curveCache !== "undefined") curveCache.clear();
+  if (state.ready) slider.dispatchEvent(new Event("input"));
+}
 $("rcRunoff").addEventListener("input", readStormFields);
 $("rcSoil").addEventListener("input", readStormFields);
 $("rcReset").addEventListener("click", () => { Object.assign(STORM, STORM_DEFAULTS); fillStormFields(); stormChanged(); });
