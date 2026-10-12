@@ -337,6 +337,32 @@ WHERE THE DATA COMES FROM
   .rc-stop::before { content: "▲ "; font-size: 9px; }
   .rc-stop:hover { text-decoration: underline; text-underline-offset: 2px; }
   .rc-stop.c { transform: translateX(-50%); } .rc-stop.l { transform: translateX(-6px); } .rc-stop.r { transform: translateX(calc(-100% + 6px)); }
+  /* The roof-share histogram. Its plot runs 12 px in from each side, the slider thumb's centre,
+     so a bar sits under the slider value it belongs to. Slate = lots that fit at the slider. */
+  .hist { margin: 14px 0 0; }
+  .hist-plot { position: relative; height: 64px; margin-top: 6px; touch-action: pan-y; }
+  .hist-plot svg { position: absolute; left: 12px; right: 12px; top: 0; width: calc(100% - 24px); height: 100%; overflow: visible; }
+  .hist-plot svg rect { fill: var(--impermeable); }
+  .hist-plot svg .rest rect { opacity: .28; }
+  .hist-plot svg .hit { fill: transparent; }
+  .hist-plot svg .hot { fill: var(--ink); opacity: .12; }
+  .hist-plot::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 1px; background: var(--rule); }
+  .hist-line { position: absolute; top: -4px; bottom: 0; width: 0; transform: translateX(-.5px); pointer-events: none; }
+  .hist-line.law50 { border-left: 1.5px dashed var(--ink-2); }
+  .hist-line.law75 { border-left: 1.5px solid var(--ink); }
+  .hist-line.rcl { border-left: 1.5px solid var(--accent); }
+  .hist-line.now { border-left: 2px solid var(--ink); top: -8px; }
+  .hist-line.now::before { content: ""; position: absolute; top: -3px; left: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+  .hist-key { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; }
+  .hist-key span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .hist-key .k { display: inline-block; width: 0; height: 12px; }
+  .hist-key .k.law50 { border-left: 1.5px dashed var(--ink-2); } .hist-key .k.law75 { border-left: 1.5px solid var(--ink); }
+  .hist-key .k.rcl { border-left: 1.5px solid var(--accent); }
+  .hist-key .k.now { border-left: 2px solid var(--ink); position: relative; }
+  .hist-key .k.now::before { content: ""; position: absolute; top: -2px; left: -4px; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
+  .hist-key .k.fit { width: 10px; height: 10px; border-radius: 2px; background: var(--impermeable); }
+  .hist-key .k.rest { width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--impermeable) 28%, var(--surface)); }
+  .hist-read { margin-top: 4px; min-height: 16px; color: var(--ink); }
   #cityHint { margin: 8px 0 0; }
   .tag { display: inline-block; font-size: 12px; line-height: 16px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; margin-bottom: 6px; }
@@ -458,6 +484,17 @@ WHERE THE DATA COMES FROM
       </div>
       <div class="stops"><span>0% · empty lot</span><span class="limit" id="limitStop"></span><span>100%</span></div>
       <div class="rc-stops"><button type="button" class="rc-stop c" id="rcStop" hidden></button></div>
+      <!-- Roof share of every lot, on the slider's own scale: the lots left of the slider fit. -->
+      <figure class="hist" id="hist" hidden>
+        <figcaption class="caption" id="histTitle"></figcaption>
+        <div class="hist-plot" id="histPlot">
+          <svg id="histSvg" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="hist-line law50" id="histL50"></div><div class="hist-line law75" id="histL75"></div>
+          <div class="hist-line rcl" id="histRc"></div><div class="hist-line now" id="histNow"></div>
+        </div>
+        <div class="hist-key caption" id="histKey"></div>
+        <div class="caption hist-read" id="histRead" aria-live="polite"></div>
+      </figure>
       <p class="caption" id="cityHint"></p>
       <div class="rows">
         <details class="row" id="checkRow"><summary><span id="checkSummary"></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary><div class="caption pad" id="checkBody"></div></details>
@@ -804,6 +841,7 @@ function renderRainCity() {
     `Held = min[rain on permeable ground + ${num(STORM.runoff * 100)}% of rain on hard surfaces, ${num(STORM.soil_mm)} mm × permeable area]; the rest overflows.` +
     (stormEdited() ? ` (Changed on this page; the defaults are ${STORM_DEFAULTS.runoff * 100}% and ${STORM_DEFAULTS.soil_mm} mm.)` : "");
   $("noteRainCity").textContent = `Rain City point (${RC_POLICY}): ${rainCityFormula(rc)}`;
+  renderHist();
 }
 // The two fields: a number in range changes the storm everywhere at once; anything else is
 // marked and ignored until it is fixed.
@@ -1601,11 +1639,68 @@ function cityUpdate() {
   $("waterNote").textContent =
     `${STORM.policy}. R1-1 has no retention rule. Assumes ${num(STORM.runoff * 100)}% runoff and ${num(STORM.soil_mm)} mm of soil storage` +
     (state.rc && state.rc.share !== null ? `; nothing reaches the sewer up to ${pct(state.rc.share)}.` : `.`);
+  renderHist();
   renderLotTotals();
   map.triggerRepaint();
 }
 slider.addEventListener("input", () => { state.hard = +slider.value / 100; cityUpdate(); syncBuildings3D(); });
 fillStormFields(); renderRainCity();
+
+// ---- The roof-share histogram (Every lot) --------------------------------------------------
+// Every assessed lot, counted by the share at which its house appears (roofShareShown: roofs
+// to the walls, at least 1%; 0 for a lot with no 2015 roof), in bars HIST_STEP wide. Plain SVG.
+const HIST_STEP = 0.02;                       // each bar is 2% of the site wide
+const SVG_NS = "http://www.w3.org/2000/svg";
+const atScale = f => `calc(${THUMB_PX / 2}px + (100% - ${THUMB_PX}px) * ${Math.max(0, Math.min(1, f)).toFixed(4)})`;
+function buildHist() {
+  const nBins = Math.round(1 / HIST_STEP), counts = new Array(nBins).fill(0);
+  const shares = state.assessed.map(roofShareShown).sort((a, b) => a - b);
+  for (const s of shares) counts[Math.min(nBins - 1, Math.floor(s / HIST_STEP + 1e-9))]++;
+  const top = Math.max(...counts), H = 64, w = HIST_STEP * 100;
+  state.hist = { counts, top, median: shares[Math.floor(shares.length / 2)] };
+  const svg = $("histSvg");
+  svg.setAttribute("viewBox", `0 0 100 ${H}`);
+  // The bars twice: faint (doesn't fit yet) and slate, clipped to the slider (fits).
+  const bars = cls => `<g class="${cls}"${cls === "fits" ? ` clip-path="url(#histClip)"` : ""}>` + counts.map((c, i) => {
+    const h = c ? Math.max(1, c / top * H) : 0;
+    return `<rect x="${i * w + 0.15}" y="${H - h}" width="${w - 0.3}" height="${h}"></rect>`;
+  }).join("") + `</g>`;
+  svg.innerHTML = `<defs><clipPath id="histClip"><rect id="histClipRect" x="0" y="-10" width="0" height="${H + 20}"></rect></clipPath></defs>` +
+    bars("rest") + bars("fits") + `<rect class="hot" id="histHot" x="0" y="0" width="${w}" height="${H}" visibility="hidden"></rect>`;
+  $("histTitle").textContent = `Roof share of all ${int(state.assessed.length)} lots, to the walls · bars ${w}% wide`;
+  $("histL50").style.left = atScale(B.building_limit);
+  $("histL75").style.left = atScale(L);
+  $("hist").hidden = false;
+  // Hover or touch a bar: its range and its lots.
+  const plot = $("histPlot"), hot = $("histHot");
+  const binAt = e => { const r = svg.getBoundingClientRect();
+    return Math.max(0, Math.min(nBins - 1, Math.floor((e.clientX - r.left) / r.width * nBins))); };
+  const show = e => {
+    const i = binAt(e), c = counts[i];
+    hot.setAttribute("x", i * w); hot.setAttribute("visibility", "visible");
+    $("histRead").textContent = `Roofs ${i * w}–${(i + 1) * w}% of the lot: ${int(c)} ${c === 1 ? "lot" : "lots"}` +
+      (i === 0 ? ` (${int(state.noRoof)} with no 2015 roof)` : "") +
+      ((i + 1) * HIST_STEP <= state.hard + 1e-9 ? " · fit at the slider" : "");
+  };
+  plot.addEventListener("pointermove", show);
+  plot.addEventListener("pointerdown", show);
+  plot.addEventListener("pointerleave", () => { hot.setAttribute("visibility", "hidden"); renderHist(); });
+  renderHist();
+}
+function renderHist() {
+  if (!state.hist) return;
+  $("histClipRect").setAttribute("width", Math.max(0, Math.min(1, state.hard)) * 100);
+  $("histNow").style.left = atScale(state.hard);
+  const rc = state.rc, rcLine = $("histRc");
+  rcLine.hidden = !rc || rc.share === null;
+  if (!rcLine.hidden) rcLine.style.left = atScale(rc.share);
+  $("histKey").innerHTML =
+    `<span><i class="k fit"></i>fit at ${pctTxt(state.hard)}</span><span><i class="k rest"></i>don't yet</span>` +
+    `<span><i class="k law50"></i>${B.building_limit * 100}% buildings</span><span><i class="k law75"></i>${L * 100}% by-law max</span>` +
+    (rc && rc.share !== null ? `<span><i class="k rcl"></i>${pctTxt(rc.share)} ${STORM.rainfall_mm} mm on site · Rain City, not the by-law</span>` : "");
+  if ($("histHot").getAttribute("visibility") !== "visible")
+    $("histRead").textContent = `Half the lots have roofs on ${pct(state.hist.median)} of the site or less.`;
+}
 
 renderPeek();                                       // the phone's peek row says "Loading…" until the data arrives
 
@@ -1876,6 +1971,7 @@ map.on("load", async () => {
   slider.disabled = false;
   const opening = OPEN_ADDRESS ? findAddress(OPEN_ADDRESS) : null;
   if (opening) selectLot(opening, true); else renderLot();
+  buildHist();
   cityUpdate();
 
   // Footprints: fetched the first time the map is close enough to show them.
