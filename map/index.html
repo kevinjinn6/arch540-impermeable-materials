@@ -189,6 +189,13 @@ WHERE THE DATA COMES FROM
   .seg button:not([aria-selected="true"]):hover { color: var(--ink); }
   .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   #modes { margin-top: 16px; height: 36px; }
+  .title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .head-btns { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .headbtn { height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .headbtn:hover { background: var(--rule); } .headbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* A short message over the map: a link that could not be opened, "Copied". */
+  .toast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; max-width: min(420px, calc(100% - 32px)); box-sizing: border-box;
+    padding: 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 16px; box-shadow: var(--float); }
 
   /* The selected lot, carried into Every-lot mode as one line */
   .chip-row { display: none; justify-content: space-between; align-items: center; gap: 12px; height: var(--row); margin-top: 4px; }
@@ -429,6 +436,7 @@ WHERE THE DATA COMES FROM
 <div id="map"></div>
 <div id="loading">Loading about 62,000 lots&hellip;</div>
 <div id="mapLegend" class="legend" aria-label="Map legend"></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <button id="legendBtn" class="mapbtn" type="button" aria-label="Legend" aria-expanded="false">i</button>
 
 <div id="panel" data-mode="lot" data-sheet="peek">
@@ -437,7 +445,7 @@ WHERE THE DATA COMES FROM
   <div class="peek" id="peek"></div>
 
   <div class="head">
-    <h1>Impermeable materials</h1>
+    <div class="title-row"><h1>Impermeable materials</h1><span class="head-btns"><button type="button" class="headbtn" id="copyLink" title="Copy a link to this view">Copy link</button></span></div>
     <p class="sub" id="subtitle"></p>
     <div class="seg" id="modes" role="tablist" aria-label="Subject">
       <button type="button" role="tab" id="tabLot" aria-selected="true" aria-controls="modeLot" data-mode="lot">One lot</button>
@@ -1243,6 +1251,7 @@ function setMode(mode, moveCamera = true) {
   renderPeek();
   syncBuildings3D();
   if (state.ready) map.triggerRepaint();     // the map shows the slider only in Every lot
+  saveView();
 }
 document.querySelectorAll("#modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
 $("handle").addEventListener("click", () => {
@@ -1469,6 +1478,7 @@ function renderLotTotals() {
   state.lotResult = { s, t, total, share, overBy, over };
   updateTick(s); renderChip(); renderPeek();
   if (state.ready) map.triggerRepaint();     // the selected lot on the map follows its bar
+  saveView();
 }
 
 // The one-line chip that carries the selected lot into Every-lot mode.
@@ -1543,6 +1553,7 @@ function clearSelection() {
   if (map.getLayer("selected")) for (const id of ["selected-casing", "selected"]) if (map.getLayer(id)) map.setFilter(id, ["==", ["get", "k"], ""]);
   addrClear.hidden = true;
   renderLot();
+  saveView();
 }
 
 function featureCenter(feature) {
@@ -1642,6 +1653,7 @@ function cityUpdate() {
   renderHist();
   renderLotTotals();
   map.triggerRepaint();
+  saveView();
 }
 slider.addEventListener("input", () => { state.hard = +slider.value / 100; cityUpdate(); syncBuildings3D(); });
 fillStormFields(); renderRainCity();
@@ -1820,6 +1832,122 @@ function syncBuildings3D() {
   map.setFilter("buildings3d", state.mode === "city" ? ["<=", ["get", "rs"], state.hard + 1e-5] : null);
 }
 
+// ---- Shareable links ---------------------------------------------------------------------
+// The view lives in the link after "#", so a copied link opens the same view:
+//   m=city            the Every-lot tab (One lot when absent)
+//   lot=R11-047990    the selected lot's key; lot=none when no lot is selected
+//   s=45              the slider, % impermeable (0 when absent)
+//   c=85&d=75         runoff % and soil mm, only when changed from the defaults
+//   p=...             the lot's paving rows, only when edited: id~m²~name, rows split by "!"
+// The link is rewritten in place (history.replaceState) a moment after things stop changing,
+// so the browser's Back button is not filled with every slider step.
+const SHARE_DELAY_MS = 300;
+let saveTimer = null, lastHash = location.hash;
+function viewHash() {
+  const q = new URLSearchParams();
+  if (state.mode === "city") q.set("m", "city");
+  const defaultLot = OPEN_ADDRESS ? findAddress(OPEN_ADDRESS) : null;
+  if (state.selected !== defaultLot) q.set("lot", state.selected ? state.selected.properties.k : "none");
+  if (state.hard > 0) q.set("s", String(+(state.hard * 100).toFixed(2)));
+  if (stormEdited()) { q.set("c", String(num(STORM.runoff * 100))); q.set("d", String(num(STORM.soil_mm))); }
+  if (state.selected && state.selected.properties.assessed && scheduleEdited())
+    q.set("p", state.schedule.map(r => [r.id, +r.m2, (r.label || "").replace(/%/g, "%25").replace(/~/g, "%7E").replace(/!/g, "%21")].join("~")).join("!"));
+  const h = q.toString();
+  return h ? `#${h}` : "";
+}
+function saveView() {
+  if (!state.viewRestored) return;               // never overwrite an incoming link before it is read
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const h = viewHash();
+    if (h === location.hash || (!h && !location.hash)) return;
+    lastHash = h;
+    history.replaceState(null, "", h || location.pathname + location.search);
+  }, SHARE_DELAY_MS);
+}
+// Read a link. Returns null when there is nothing to read, { ok: false, msg } when something
+// in it can't be used, or the view to open.
+function readView(hash) {
+  const raw = (hash || "").replace(/^#/, "");
+  if (!raw) return null;
+  const q = new URLSearchParams(raw), bad = msg => ({ ok: false, msg });
+  const known = new Set(["m", "lot", "s", "c", "d", "p"]);
+  if (![...q.keys()].some(k => known.has(k))) return bad("This link doesn't describe a view of the map.");
+  const v = { ok: true, mode: q.get("m") === "city" ? "city" : "lot", lot: undefined, hard: 0, storm: null, schedule: null };
+  if (q.has("m") && !["city", "lot"].includes(q.get("m"))) return bad("This link has a view the map doesn't know.");
+  if (q.has("lot")) {
+    const k = q.get("lot");
+    if (k === "none") v.lot = null;
+    else if (state.byKey.has(k)) v.lot = state.byKey.get(k);
+    else return bad(`The lot in this link (${esc(k)}) isn't on this map.`);
+  }
+  if (q.has("s")) {
+    const s = Number(q.get("s"));
+    if (q.get("s") === "" || !(s >= 0 && s <= 100)) return bad("The slider value in this link isn't between 0% and 100%.");
+    v.hard = s / 100;
+  }
+  if (q.has("c") || q.has("d")) {
+    const c = Number(q.has("c") ? q.get("c") : STORM_DEFAULTS.runoff * 100), d = Number(q.has("d") ? q.get("d") : STORM_DEFAULTS.soil_mm);
+    if (!(c >= 0 && c <= 100) || !(d >= 0 && d <= 1000)) return bad("The storm assumptions in this link are out of range.");
+    v.storm = { runoff: c / 100, soil_mm: d };
+  }
+  if (q.has("p")) {
+    const rows = q.get("p").split("!").map(t => t.split("~"));
+    if (rows.length > 40 || rows.some(r => r.length !== 3 || !MAT[r[0]] || !(Number(r[1]) >= 0) || r[1] === ""))
+      return bad("The paving in this link can't be read.");
+    try { v.schedule = rows.map(([id, a, label]) => ({ id, m2: Number(a), label: decodeURIComponent(label).slice(0, 40) })); }
+    catch (e) { return bad("The paving in this link can't be read."); }
+  }
+  return v;
+}
+function openDefaultView() {
+  const opening = OPEN_ADDRESS ? findAddress(OPEN_ADDRESS) : null;
+  if (opening) selectLot(opening, true); else renderLot();
+}
+function applyView(v) {
+  if (v.storm) { Object.assign(STORM, v.storm); fillStormFields(); renderRainCity(); }
+  const lot = v.lot === undefined ? (OPEN_ADDRESS ? findAddress(OPEN_ADDRESS) : null) : v.lot;
+  if (lot) {
+    selectLot(lot, v.mode === "lot");
+    if (v.schedule) { state.schedule = v.schedule; renderLot(); }
+  } else clearSelection();
+  const s = +(v.hard * 100).toFixed(2);
+  slider.step = Number.isInteger(s) ? "1" : "any";          // a value off the whole percents, e.g. the Rain City point
+  slider.value = String(s);
+  state.hard = +slider.value / 100;
+  setMode(v.mode, v.mode === "city");
+}
+// A link pasted into the address bar of an open page changes only the "#": open it too.
+addEventListener("hashchange", () => {
+  if (!state.ready || location.hash === lastHash) return;
+  lastHash = location.hash;
+  const v = readView(location.hash);
+  if (v && v.ok) { applyView(v); cityUpdate(); }
+  else if (v) toast(`${v.msg} The view is unchanged.`, 6000);
+});
+let toastTimer = null;
+function toast(msg, ms = 2500) {
+  const t = $("toast"); t.innerHTML = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+}
+$("copyLink").addEventListener("click", async () => {
+  clearTimeout(saveTimer);
+  const h = viewHash();
+  if (state.ready && h !== location.hash) { lastHash = h; history.replaceState(null, "", h || location.pathname + location.search); }
+  const url = location.href, btn = $("copyLink");
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; }
+  catch (e) {                                   // older browsers, or a page not served over https
+    const ta = document.createElement("textarea"); ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    ta.remove();
+  }
+  btn.textContent = ok ? "Copied ✓" : "Copy failed";
+  if (!ok) toast(`Copy this link: ${esc(url)}`, 8000);
+  setTimeout(() => { btn.textContent = "Copy link"; }, 1600);
+});
+
 // ---- Load ------------------------------------------------------------------------------
 map.on("load", async () => {
   let data, walls = null;
@@ -1969,10 +2097,15 @@ map.on("load", async () => {
   const pr = $("progress"); if (pr) pr.remove();
   state.ready = true;
   slider.disabled = false;
-  const opening = OPEN_ADDRESS ? findAddress(OPEN_ADDRESS) : null;
-  if (opening) selectLot(opening, true); else renderLot();
+  const shared = readView(location.hash);
+  if (shared && shared.ok) applyView(shared);
+  else {
+    openDefaultView();
+    if (shared) toast(`${shared.msg} Showing the default view instead.`, 6000);
+  }
   buildHist();
   cityUpdate();
+  state.viewRestored = true; saveView();
 
   // Footprints: fetched the first time the map is close enough to show them.
   let footprintsRequested = false;
