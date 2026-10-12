@@ -102,10 +102,14 @@ WHERE THE DATA COMES FROM
 <!-- earcut cuts each lot outline into triangles, which is what the graphics card draws. -->
 <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
 <style>
-  /* Colours. Purple means "over the 75% cap" everywhere: on the map, on the lot's bar, on the
-     slider and on the FAIL pill. Red only ever means "impermeable material". The purple is a
-     dark violet on the light theme and a lavender on the dark one, so it differs from red and
-     blue in lightness as well as hue (hue alone is lost on red-blind viewers). */
+  /* Colours. The ground is drawn as its material: sand = permeable (soil), slate = impermeable
+     (paving); blue is kept for water and green for parks. Purple means "over the 75% cap"
+     everywhere: on the map, on the lot's bar, on the slider and on the FAIL pill. Sand, slate
+     and purple differ in lightness as well as hue (hue alone is lost on colour-blind viewers):
+     a pale sand, a mid slate and a dark violet on the light theme; on the dark one a vivid violet
+     (--over-fill, on the map and the lot's bar) sits below both, kept apart by its strength of
+     colour, and text stays a lavender, which reads better small. The sand is pale so it doesn't merge with the parks'
+     green for red-green colour-blind viewers. Not-assessed lots are hatched (--hatch), not filled. */
   :root {
     --surface: #fbfaf7; --ink: #1c1b18; --ink-2: #54524c; --ink-3: #65635c;
     --rule: #e4e1da; --fill: #efede8; --accent: #2a6fc4;
@@ -113,8 +117,8 @@ WHERE THE DATA COMES FROM
     --glass: color-mix(in srgb, var(--surface) 92%, transparent);
     --sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --permeable: #287bc1; --impermeable: #d94a48; --over: #581c87; --check: #ffbf00; --check-ink: #b45309; --out: #b9b8b2;
-    --roof: #3d3d3a;
+    --permeable: #e0c99c; --impermeable: #5f6670; --over: #581c87; --check: #ffbf00; --check-ink: #b45309; --out: #b9b8b2;
+    --roof: #3d3d3a; --hatch: #a3a19a; --over-fill: #581c87;
     --pass: #2f7d4f; --fail: #581c87; --on-pill: #fff;
     --row: 44px;
   }
@@ -123,6 +127,7 @@ WHERE THE DATA COMES FROM
       --surface: #1b1a18; --ink: #f2f0eb; --ink-2: #bab7b0; --ink-3: #9c9991;
       --rule: #34322e; --fill: #272522; --accent: #5b9cec;
       --float: 0 0 0 1px rgba(255,255,255,.07), 0 12px 32px -8px rgba(0,0,0,.6); --over: #d8b4fe; --check-ink: #ffbf47; --out: #5a5955;
+      --permeable: #e6cf9f; --impermeable: #9aa3ad; --hatch: #6e6c66; --over-fill: #a855f7;
       --roof: #6b6a65; --pass: #5fbf85; --fail: #d8b4fe; --on-pill: #1f1f1d;
     }
   }
@@ -130,6 +135,7 @@ WHERE THE DATA COMES FROM
     --surface: #1b1a18; --ink: #f2f0eb; --ink-2: #bab7b0; --ink-3: #9c9991;
     --rule: #34322e; --fill: #272522; --accent: #5b9cec;
     --float: 0 0 0 1px rgba(255,255,255,.07), 0 12px 32px -8px rgba(0,0,0,.6); --over: #d8b4fe; --check-ink: #ffbf47; --out: #5a5955;
+    --permeable: #e6cf9f; --impermeable: #9aa3ad; --hatch: #6e6c66; --over-fill: #a855f7;
     --roof: #6b6a65; --pass: #5fbf85; --fail: #d8b4fe; --on-pill: #1f1f1d;
   }
   html, body { margin: 0; height: 100%; background: var(--surface); color: var(--ink);
@@ -205,8 +211,8 @@ WHERE THE DATA COMES FROM
   .areabar { position: relative; display: flex; height: 16px; border-radius: 5px; background: var(--rule); margin: 14px 0 30px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
   .areabar span { height: 100%; transition: width 250ms ease-out; }
   .areabar span:first-child { border-radius: 5px 0 0 5px; }
-  #barRoof { background: var(--roof); } #barRed { background: var(--impermeable); } #barOver { background: var(--over); } #barBlue { background: var(--permeable); }
-  .areabar.out { background: var(--out); margin-bottom: 16px; }
+  #barRoof { background: var(--roof); } #barRed { background: var(--impermeable); } #barOver { background: var(--over-fill); } #barBlue { background: var(--permeable); }
+  .areabar.out { background: repeating-linear-gradient(135deg, var(--hatch) 0 1.5px, transparent 1.5px 7px); box-shadow: inset 0 0 0 1px var(--hatch); margin-bottom: 16px; }
   .areabar .mark { position: absolute; top: -3px; width: 1.5px; height: 22px; background: var(--ink); border-radius: 1px; }
   .areabar .mark i, .areabar .ghost i { position: absolute; top: 22px; left: 0; transform: translateX(-50%); font-style: normal;
     font-size: 12px; line-height: 16px; color: var(--ink-2); white-space: nowrap; }
@@ -299,8 +305,8 @@ WHERE THE DATA COMES FROM
   input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 1px; }
   input[type=range]:active::-webkit-slider-thumb { box-shadow: 0 0 0 .5px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.18), 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); }
   input[type=range]:disabled { cursor: default; opacity: .6; }
-  /* The tick is the selected lot's room: the track is blue up to it and purple past it. Its label sits above the track. */
-  .tick { position: absolute; top: 24px; width: 2px; height: 16px; background: var(--over); transform: translateX(-1px); border-radius: 1px; }
+  /* The tick is the selected lot's room: the track is sand up to it and purple past it. Its label sits above the track. */
+  .tick { position: absolute; top: 24px; width: 2px; height: 16px; background: var(--over-fill); transform: translateX(-1px); border-radius: 1px; }
   .tick span { position: absolute; bottom: 100%; margin-bottom: 6px; font-size: 12px; line-height: 16px; color: var(--over); white-space: nowrap; }
   .tick.l span { left: 0; } .tick.c span { left: 0; transform: translateX(-50%); } .tick.r span { right: 0; }
   .stops { position: relative; display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
@@ -331,6 +337,7 @@ WHERE THE DATA COMES FROM
   .legend div { display: flex; align-items: center; gap: 6px; }
   .swatch { width: 12px; height: 12px; border-radius: 4px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
   .swatch.outline { box-sizing: border-box; border: 2px solid var(--check); outline: 1px solid var(--ink); background: transparent !important; }
+  .swatch.hatch { background: repeating-linear-gradient(135deg, var(--hatch) 0 1.25px, transparent 1.25px 4px) !important; box-shadow: inset 0 0 0 1px var(--hatch); }
   .swatch.dot { border-radius: 50%; }
   .swatch.small-dot { width: 6px; height: 6px; margin: 3px; box-shadow: none; }
   .swatch.picked { box-sizing: border-box; border: 2px dashed var(--ink); background: transparent !important; }
@@ -502,7 +509,7 @@ const EAVE_M = 0.45;
 // before clipping it to the site (buildings.py EAVE_M, or data/roof-walls.json).
 const NOT_A_SITE_M2 = 150;
 // Parcels smaller than this, or flagged by the pipeline (cd: roof over 90%;
-// f: shared address, not adjoining), are drawn grey and not assessed: they are
+// f: shared address, not adjoining), are drawn hatched and not assessed: they are
 // usually strata remnants or data faults, not sites.
 
 // ---- Rainfall and soil (the storm card; NOT the by-law) ----------------------
@@ -515,11 +522,13 @@ const STORM = {
 };
 
 // ---- Colours for the lots (CSS variables above hold the panel's) ------------
-// blue = permeable, red = impermeable (growing from the south edge of each lot, as a diagram),
-// purple = the lot is over the 75% cap at this setting, amber = roof alone over 50% even to the walls: check.
-// The purple is a dark violet on the light basemap and a lavender on the dark one, so that it
-// differs from red and from blue in lightness, not only in hue. Keep these equal to --over above.
-const COLOR = { permeable: "#287bc1", impermeable: "#d94a48", over: "#581c87", overDark: "#d8b4fe", check: "#ffbf00",
+// sand = permeable, slate = impermeable (growing from the south edge of each lot, as a diagram),
+// purple = the lot is over the 75% cap at this setting, amber = roof alone over 50% even to the walls: check,
+// hatched = not assessed. Blue is left for water and green for parks. Each pair (light basemap,
+// dark basemap) differs in lightness, not only in hue, so they hold for colour-blind viewers
+// (see the note on the colours above). Keep these equal to the CSS variables.
+const COLOR = { permeable: "#e0c99c", permeableDark: "#e6cf9f", impermeable: "#5f6670", impermeableDark: "#9aa3ad",
+                over: "#581c87", overDark: "#a855f7", check: "#ffbf00", hatch: "#a3a19a", hatchDark: "#6e6c66",
                 out: "#b9b8b2", roof: "#3d3d3a", roofDark: "#6b6a65", park: "#3f9a4a", parkDark: "#4f9a5a",
                 garden: "#c3e88d", gardenEdge: "#1d4d24", basin: "#17212b", basinDark: "#e8eef5" };
 const BASINS_MIN_ZOOM = 15;           // catch basins are drawn from this zoom in
@@ -623,6 +632,7 @@ const B = BYLAW, P50 = PASSAGES.s3227, P75 = PASSAGES.s3228, L = B.impermeable_l
 const $ = id => document.getElementById(id);
 const dark = matchMedia("(prefers-color-scheme: dark)").matches;
 const OVER = dark ? COLOR.overDark : COLOR.over;          // the map's purple for this theme
+const PERM = dark ? COLOR.permeableDark : COLOR.permeable, IMP = dark ? COLOR.impermeableDark : COLOR.impermeable;
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const pageOf = ref => (ref.match(/p\.\d+/) || [""])[0];                      // "p.20"
 const shortRef = ref => { const t = ref.split(","); return `${t[0].trim()} · ${t[t.length - 1].trim()}`; };  // "s.3.2.2.8 · p.12"
@@ -660,12 +670,12 @@ slider.max = "100";
 }
 const sw = c => `<span class="swatch" style="background:${c}"></span>`;
 $("mapLegend").innerHTML = [
-  [sw(COLOR.permeable), "Permeable"],
-  [sw(COLOR.impermeable), "Impermeable"],
+  [sw(PERM), "Permeable"],
+  [sw(IMP), "Impermeable"],
   [sw(OVER), `Over ${L * 100}%`],
   [`<span class="swatch outline"></span>`, `Check: roof over ${B.building_limit * 100}%`],
   [`<span class="swatch picked"></span>`, "Selected lot"],
-  [sw(COLOR.out), "Not assessed"],
+  [`<span class="swatch hatch"></span>`, "Not assessed"],
   [sw(COLOR.park), "Park"],
   [`<span class="swatch dot" style="background:${COLOR.garden};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Community garden"],
   [`<span class="swatch dot small-dot" style="background:${dark ? COLOR.basinDark : COLOR.basin}"></span>`, "Catch basin"],
@@ -674,7 +684,7 @@ $("mapLegend").innerHTML = [
   `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
 $("notes").innerHTML = [
   `Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.`,
-  `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m², flagged parcels and park land with no building are grey: not assessed.`,
+  `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m², flagged parcels and park land with no building are hatched: not assessed.`,
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
   `Paving is in no City dataset: the schedule and the slider are hypotheses you set. Not a compliance finding; a reviewer measures from a survey.`,
   `At exactly ${L * 100}% a lot passes. Colours use unrounded areas.`,
@@ -685,7 +695,7 @@ $("footer").innerHTML =
   `<a href="${B.section2_url}" target="_blank" rel="noopener">Section 2</a> (p.20, p.31, p.43, p.11) · City of Vancouver open data · ` +
   `<a href="${B.repo_url}" target="_blank" rel="noopener">Repository</a>: pipeline, Rhino script, tests, source extract · ${VERSION}`;
 $("waterPolicy").textContent = `${STORM.policy.replace(" (2019), a Council policy", ", a Council policy")} · not the by-law`;
-for (const [id, c] of [["barHeld", COLOR.permeable], ["barSewer", OVER], ["barSurface", COLOR.out]]) $(id).style.background = c;
+for (const [id, c] of [["barHeld", PERM], ["barSewer", OVER], ["barSurface", COLOR.out]]) $(id).style.background = c;
 const skeleton = () => `<div class="skel" aria-hidden="true"><span style="width:56%;height:20px"></span><span></span><span style="width:44%;height:28px"></span><span style="margin-top:8px"></span><span style="width:84%"></span></div>` +
   `<p class="caption" style="margin:20px 0 0">Loading 62,000 lots (17 MB)…</p>`;
 $("lot").innerHTML = skeleton();
@@ -745,12 +755,14 @@ map.on("error", e => {
 // Each lot is sent once with four numbers per corner: position, its north-south
 // position within the lot, and two per-lot values the slider does not change:
 //   a_roof   roof share to the walls, 0-1           a_A  site area, m²
-//   a_sc     0 assessed, 1 not assessed (grey)    a_id lot number, 1 up
+//   a_sc     0 assessed, 1 not assessed (hatched) a_id lot number, 1 up
 // u_scenario is 1 in Every-lot mode: each lot is then hard up to u_hard (the
-// slider, 0-1), red up to 75% and a purple stripe for the share past 75%. In
+// slider, 0-1), slate up to 75% and a purple stripe for the share past 75%. In
 // One-lot mode (0) each lot shows its own roofs, purple if they pass 75%;
 // the selected lot (u_sel) shows its roofs plus the card's paving (u_selShare),
-// red to 75% and a purple stripe past it, the same split as its bar.
+// slate to 75% and a purple stripe past it, the same split as its bar.
+// A not-assessed lot is drawn as thin diagonal hatching in screen pixels (u_px = device pixels
+// per CSS pixel), with the basemap showing between the lines.
 // a_z is the corner's ground height in metres (lot-ground.bin), used only in the 3D view:
 // u_zscale turns metres into map units (0 in 2D) and u_zoff is the height MapLibre's camera
 // is already measured from, which its matrix for this kind of layer leaves out.
@@ -763,14 +775,17 @@ const LOT_SHADER = {
     void main() { gl_Position = u_matrix * vec4(a_pos, (a_z - u_zoff) * u_zscale, 1.0); v_y = a_y; v_sc = a_sc; v_roof = a_roof; v_A = a_A; v_id = a_id; }`,
   fragment: `
     precision highp float;
-    uniform float u_hard, u_scenario, u_limit, u_opacity, u_sel, u_selShare;
+    uniform float u_hard, u_scenario, u_limit, u_opacity, u_sel, u_selShare, u_px;
     uniform vec3 u_permeable, u_impermeable, u_over, u_out;
     varying float v_y, v_sc, v_roof, v_A, v_id;
     void main() {
       vec3 c;
       bool picked = u_scenario < 0.5 && u_sel > 0.5 && abs(v_id - u_sel) < 0.5;
       float hard = u_scenario > 0.5 ? u_hard : u_selShare;
-      if (v_sc > 0.5) c = u_out;
+      if (v_sc > 0.5) {
+        if (mod(gl_FragCoord.x - gl_FragCoord.y, 7.0 * u_px) > 1.5 * u_px) discard;
+        c = u_out;
+      }
       else if (u_scenario > 0.5 || picked)
         c = v_y >= 1.0 - u_limit ? (v_y >= 1.0 - hard ? u_impermeable : u_permeable)
           : (v_y >= 1.0 - hard ? u_over : u_permeable);
@@ -844,7 +859,7 @@ function lotLayer(mesh) {
       gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, LOT_SHADER.fragment));
       gl.linkProgram(prog);
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_permeable", "u_impermeable", "u_over", "u_out", "u_zscale", "u_zoff"])
+      for (const u of ["u_matrix", "u_hard", "u_scenario", "u_limit", "u_opacity", "u_sel", "u_selShare", "u_px", "u_permeable", "u_impermeable", "u_over", "u_out", "u_zscale", "u_zoff"])
         loc[u] = gl.getUniformLocation(prog, u);
       vao = gl2 ? gl.createVertexArray() : vaoExt.createVertexArrayOES();
       this.bindVAO(vao);
@@ -870,10 +885,11 @@ function lotLayer(mesh) {
       gl.uniform1f(loc.u_opacity, LOT_OPACITY);
       gl.uniform1f(loc.u_sel, state.lotResult ? state.selected.properties._mi || 0 : 0);
       gl.uniform1f(loc.u_selShare, state.lotResult ? state.lotResult.share : 0);
-      gl.uniform3fv(loc.u_permeable, hexToRGB(COLOR.permeable));
-      gl.uniform3fv(loc.u_impermeable, hexToRGB(COLOR.impermeable));
+      gl.uniform1f(loc.u_px, devicePixelRatio || 1);
+      gl.uniform3fv(loc.u_permeable, hexToRGB(PERM));
+      gl.uniform3fv(loc.u_impermeable, hexToRGB(IMP));
       gl.uniform3fv(loc.u_over, hexToRGB(OVER));
-      gl.uniform3fv(loc.u_out, hexToRGB(COLOR.out));
+      gl.uniform3fv(loc.u_out, hexToRGB(dark ? COLOR.hatchDark : COLOR.hatch));
       gl.uniform1f(loc.u_zscale, state.view3d ? Z_PER_METRE : 0);
       gl.uniform1f(loc.u_zoff, state.view3d ? map.transform.elevation : 0);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.disable(gl.CULL_FACE);
@@ -1101,7 +1117,7 @@ function renderLot() {
     html += `<div class="areabar out" aria-hidden="true"></div>` +
       `<div class="verdict"><span class="pill out">Not assessed</span></div>` +
       `<p style="margin:8px 0 0">${cap(flags.join(". "))}.</p>` +
-      `<div class="rows"><button type="button" class="row linkrow" id="whyGrey">Why some lots are grey${CHEV}</button></div>`;
+      `<div class="rows"><button type="button" class="row linkrow" id="whyGrey">Why some lots are hatched${CHEV}</button></div>`;
     el.innerHTML = html;
     $("whyGrey").addEventListener("click", openNotes);
     state.lotResult = null; updateTick(null); renderChip(); renderPeek(); return;
@@ -1111,8 +1127,8 @@ function renderLot() {
   const st50 = s.over50wall ? "Over, even to the walls: check the data and the year."
     : s.over50edge ? "Within by the walls; the roof edge alone reads over." : "Within.";
 
-  // The area bar: the site as 100%. Dark = roofs to the walls, red = paving that
-  // counts, purple = the part past 75%, blue = room still left under 75%.
+  // The area bar: the site as 100%. Dark = roofs to the walls, slate = paving that
+  // counts, purple = the part past 75%, sand = room still left under 75%.
   html += `<div class="areabar" id="areabar" aria-hidden="true">` +
     `<span id="barRoof"></span><span id="barRed"></span><span id="barOver"></span><span id="barBlue"></span>` +
     `<div class="mark" style="left:${B.building_limit * 100}%"><i>${B.building_limit * 100}%</i></div>` +
@@ -1596,7 +1612,7 @@ map.on("load", async () => {
   map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
     paint: { "line-color": dark ? "#1a1a19" : "#fcfcfb", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.3, 18, 1.5] } }, firstLabel);
   // Parks, green: where the water could go. Drawn over the lots because many
-  // park parcels are in the lot data (large sites in grey, some zoned R1-1);
+  // park parcels are in the lot data (large sites hatched, some zoned R1-1);
   // the check rings and the selection stay on top. MapLibre fetches the file
   // itself; if it is missing the map simply has no parks.
   map.addSource("parks", { type: "geojson", data: PARKS_FILE });
