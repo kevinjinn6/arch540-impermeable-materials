@@ -197,6 +197,21 @@ WHERE THE DATA COMES FROM
   .head-btns { display: inline-flex; align-items: center; gap: 6px; flex: none; }
   .headbtn { height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--ink); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .headbtn:hover { background: var(--rule); } .headbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .headbtn.info { width: 28px; padding: 0; font: italic 600 15px/1 Georgia, "Times New Roman", serif; }
+  /* The intro card, over the map */
+  .intro { position: fixed; inset: 0; z-index: 6; display: grid; place-items: center; padding: 16px;
+    background: color-mix(in srgb, var(--ink) 28%, transparent); }
+  .intro-card { position: relative; box-sizing: border-box; width: min(440px, 100%); max-height: calc(100% - 32px); overflow-y: auto;
+    padding: 24px 24px 20px; border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--float); }
+  .intro-card h2 { font-size: 17px; line-height: 22px; letter-spacing: -.01em; text-transform: none; color: var(--ink); margin: 0 32px 8px 0; }
+  .intro-card p { margin: 0 0 10px; text-wrap: pretty; }
+  .intro-x { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent;
+    color: var(--ink-2); font-size: 22px; line-height: 1; cursor: pointer; }
+  .intro-x:hover { background: var(--fill); color: var(--ink); }
+  .intro-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 14px; }
+  .intro-go { height: var(--row); padding: 0 18px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-pill);
+    font: inherit; font-weight: 600; cursor: pointer; }
+  .intro-go:focus-visible, .intro-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* A short message over the map: a link that could not be opened, "Copied". */
   .toast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; max-width: min(420px, calc(100% - 32px)); box-sizing: border-box;
     padding: 10px 14px; border-radius: 12px; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 16px; box-shadow: var(--float); }
@@ -447,6 +462,20 @@ WHERE THE DATA COMES FROM
 <div id="loading">Loading about 62,000 lots&hellip;</div>
 <div id="mapLegend" class="legend" aria-label="Map legend"></div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<!-- The intro: shown on a first visit (not when a shared link is opened), and from the "i" button. -->
+<div id="intro" class="intro" role="dialog" aria-modal="true" aria-labelledby="introTitle" hidden>
+  <div class="intro-card">
+    <button type="button" class="intro-x" id="introClose" aria-label="Close the introduction">×</button>
+    <h2 id="introTitle">About this map</h2>
+    <p>This map checks every R1-1 lot in Vancouver against the zoning by-law's limits: buildings may cover 50% of a site, and impermeable materials, buildings included, 75%. Roofs come from the City's 2015 air photos.</p>
+    <p>Search an address to test a paving plan on one lot, or switch to Every lot to see the whole city respond as the limit changes.</p>
+    <p class="caption">The storm figures use the Rain City Strategy's 48 mm standard, a Council policy, not the by-law.</p>
+    <div class="intro-actions">
+      <button type="button" class="intro-go" id="introGo">Search an address</button>
+      <button type="button" class="linkbtn" id="introCity">or see Every lot</button>
+    </div>
+  </div>
+</div>
 <button id="legendBtn" class="mapbtn" type="button" aria-label="Legend" aria-expanded="false">i</button>
 
 <div id="panel" data-mode="lot" data-sheet="peek">
@@ -455,7 +484,7 @@ WHERE THE DATA COMES FROM
   <div class="peek" id="peek"></div>
 
   <div class="head">
-    <div class="title-row"><h1>Impermeable materials</h1><span class="head-btns"><button type="button" class="headbtn" id="copyLink" title="Copy a link to this view">Copy link</button></span></div>
+    <div class="title-row"><h1>Impermeable materials</h1><span class="head-btns"><button type="button" class="headbtn" id="copyLink" title="Copy a link to this view">Copy link</button><button type="button" class="headbtn info" id="infoBtn" aria-label="About this map" title="About this map" aria-haspopup="dialog">i</button></span></div>
     <p class="sub" id="subtitle"></p>
     <div class="seg" id="modes" role="tablist" aria-label="Subject">
       <button type="button" role="tab" id="tabLot" aria-selected="true" aria-controls="modeLot" data-mode="lot">One lot</button>
@@ -1970,6 +1999,39 @@ $("copyLink").addEventListener("click", async () => {
   if (!ok) toast(`Copy this link: ${esc(url)}`, 8000);
   setTimeout(() => { btn.textContent = "Copy link"; }, 1600);
 });
+
+// ---- The intro card ------------------------------------------------------------------------
+// Shown once on a first visit (remembered in this browser), never when a shared link is opened
+// (it already says what to look at), and again from the "i" button.
+const INTRO_SEEN_KEY = "r11-map-intro-seen";
+let introReturn = null;
+function showIntro() {
+  introReturn = document.activeElement;
+  $("intro").hidden = false;
+  $("introGo").focus();
+}
+function hideIntro() {
+  $("intro").hidden = true;
+  try { localStorage.setItem(INTRO_SEEN_KEY, "1"); } catch (e) { /* private window: show it again next time */ }
+  if (introReturn && introReturn.focus) introReturn.focus();
+}
+$("infoBtn").addEventListener("click", showIntro);
+$("introClose").addEventListener("click", hideIntro);
+$("intro").addEventListener("click", e => { if (e.target === $("intro")) hideIntro(); });     // a click outside the card
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("intro").hidden) hideIntro(); });
+// The first step: the address search, in One lot (with the phone's sheet open).
+$("introGo").addEventListener("click", () => {
+  introReturn = addr; hideIntro();
+  if (state.mode !== "lot") setMode("lot");
+  if (innerWidth <= 560) panel.dataset.sheet = "full";
+  addr.select();
+});
+$("introCity").addEventListener("click", () => { introReturn = null; hideIntro(); setMode("city"); if (innerWidth <= 560) panel.dataset.sheet = "full"; });
+{
+  let seen = false;
+  try { seen = localStorage.getItem(INTRO_SEEN_KEY) === "1"; } catch (e) { seen = false; }
+  if (!seen && !location.hash) showIntro();
+}
 
 // ---- Load ------------------------------------------------------------------------------
 map.on("load", async () => {
