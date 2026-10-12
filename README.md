@@ -25,17 +25,21 @@ Strategy climate goals.
 **In a browser.** Open the [live map](https://kevinjinn6.github.io/arch540-impermeable-materials/)
 on a laptop (it works on a phone, but the panel is easier on a wide screen).
 It needs an internet connection and loads about 8 MB of lot data, and the lot
-card fills in once it has loaded, opening up on 3528 W 30th Ave.
+card fills in once it has loaded, opening up on 3528 W 30th Ave. A short
+introduction appears on a first visit; the **i** button in the panel's header
+brings it back.
 
 1. **Pick a lot.** Click a lot on the map, or type a civic address in the
    search box the City's way (`3528 W 30TH AV` is the default lot, with suggestions that appear as you
    type) and press Enter. The map flies to it and draws a dashed line around
    it. The card leads with the answer: a bar where the whole site is 100%,
-   marked at 50% and 75% (dark is roof, red is paving, blue is room left,
-   purple is over the limit), then **PASS** or **FAIL** with the margin in
-   square metres. Under it: the 2015 roofs measured to the walls, the 50%
-   buildings rule, and the room s.3.2.2.8 leaves after the roofs. Tap any
-   blue reference, such as *s.3.2.2.8 · p.12*, to read that passage in place.
+   marked at 50% and 75% (dark is roof, slate is paving, sand is room left,
+   striped purple is over the limit), then **PASS** or **FAIL** with the
+   margin in square metres, and a reminder that the roofs come from the 2015
+   air photo (click it for the assumptions). Under it: the 2015 roofs
+   measured to the walls, the 50% buildings rule, and the room s.3.2.2.8
+   leaves after the roofs. Tap any blue reference, such as
+   *s.3.2.2.8 · p.12*, to read that passage in place.
 2. **Fill in what else is on the lot.** Under *Paving*, three example
    surfaces are filled in (a driveway in permeable pavers, walks in concrete,
    a deck). They are examples, not measurements. Rename a surface by typing
@@ -50,15 +54,35 @@ card fills in once it has loaded, opening up on 3528 W 30th Ave.
    check it by hand. The schedule starts again for each new lot.
 3. **Try the whole city.** Switch to **Every lot**. The slider sets the same
    impermeable share on every lot at once, from 0% (an empty lot) to 100%.
-   A house appears once its roofs fit within that share, and the mark at 75% is
-   the by-law maximum, and past it every lot shows a purple stripe for the
-   share over the limit. The purple tick on the slider is the selected lot's
-   own roof share. *Change ›* goes back to pick another lot.
-4. **See the storm water.** *48 mm storm* in Every lot, and *Storm* in a
-   lot's card, show how much of a 48 mm rain day the lots could hold. This
-   comes from the Rain City Strategy, a Council policy, **not the by-law**,
-   its assumptions are written beside it.
-5. **Read the rule.** *The by-law, verbatim*, at the foot of the panel,
+   The count above it is out of all 62,144 assessed lots: a lot fits once
+   its 2015 roofs fit within that share (the 787 lots with no 2015 roof fit
+   from 0%), and its house appears on the map. The mark at 75% is the by-law
+   maximum; past it every lot shows a striped purple band for the share over
+   the limit. The purple tick is the selected lot's own roof share. Under the
+   slider, a histogram shows the roof share of every lot, with lines at 50%,
+   75%, the Rain City point and the slider; the bars left of the slider are
+   the lots that fit. *Change ›* goes back to pick another lot.
+4. **See the storm water.** The line under the count gives the **Rain City
+   point**: the share of hard surface at which a lot keeps a 48 mm rain day
+   on site, sending nothing to the storm sewer (39.8%, against the by-law's
+   75%). It is the same on every lot, because the lot's area cancels out:
+   nothing overflows while 48 × (1 − h) + 0.85 × 48 × h ≤ 75 × (1 − h), so
+   h = (75 − 48) ÷ (75 − 48 + 0.85 × 48). The blue mark under the slider moves
+   it there. The two assumptions, 85% runoff and 75 mm of soil storage, can be
+   changed on the page, with *Reset to defaults*. *48 mm storm* shows where
+   the city's water goes at the slider, and *Storm* in a lot's card gives the
+   point in square metres for that lot. This comes from the Rain City
+   Strategy, a Council policy, **not the by-law**, and is labelled so
+   wherever it appears.
+5. **Share a view.** The page's address keeps the tab, the lot, the slider,
+   any changed storm assumptions and any edited paving. *Copy link* in the
+   header copies it; whoever opens it sees the same view.
+6. **Other views.** Under the zoom buttons, *City* zooms out to the whole
+   city, *3D* tilts the map over the 2013 ground with the 2015 buildings at
+   their heights, and *Water* shows where rain runs and ponds once it leaves
+   the lots (also not the by-law; its card explains the model). Parks,
+   community gardens and street catch basins are drawn for context.
+7. **Read the rule.** *The by-law, verbatim*, at the foot of the panel,
    quotes s.3.2.2.7, s.3.2.2.8, s.4.2.2 and the Section 2 definitions word
    for word, with their pages in the June 2026 consolidation, then the
    assumptions and the sources.
@@ -66,8 +90,11 @@ card fills in once it has loaded, opening up on 3528 W 30th Ave.
 **Locally.** The page needs a small web server to load its data files:
 
 ```bash
-cd map && python3 -m http.server      # then open http://localhost:8000
+cd map && python3 serve.py      # then open http://localhost:8000
 ```
+
+(`python3 -m http.server` also works, but drops some of the 3D view's ground
+tiles.)
 
 **In Rhino 8.** Download or clone this repository (green **Code** button on
 GitHub → *Download ZIP*, then unzip it). In Rhino 8 type `ScriptEditor` and
@@ -93,7 +120,17 @@ pip install -r requirements.txt
 python stormwater.py          # R1-1 parcels            -> r11_stormwater.geojson
 python buildings.py           # sites, 2015 roofs       -> map/data/lots.geojson, buildings.geojson
 python map/roof_walls.py      # roofs to the walls      -> map/data/roof-walls.json
+python map/park_lots.py       # empty park land, not assessed -> map/data/park-lots.json
 python3 map/check_data.py     # the figures below still hold?
+```
+
+The shaded relief and the 3D ground come from the City's 2013 elevation model
+(`DEM_2013.tif`, 1.9 GB, not committed; put it in the project folder):
+
+```bash
+python map/terrain_tiles.py   # relief and ground tiles   -> map/data/relief/, map/data/terrain/
+python map/lot_ground.py      # ground under every lot    -> map/data/lot-ground.bin
+python map/water_layers.py    # where the water goes      -> map/data/water.json, flow-paths, low spots
 ```
 
 ## Source
@@ -103,7 +140,8 @@ python3 map/check_data.py     # the figures below still hold?
 | Zoning and Development By-law No. 3575, **R1-1 District Schedule** (`sources/zoning-by-law-district-schedule-r1-1.pdf`) | June 2026 consolidation, 17 pp. | s.3.2 and s.3.2.2.1 (p.12), **s.3.2.2.7** and **s.3.2.2.8** (p.12), s.2.2.4 (p.5), **s.4.2.2** (p.16) |
 | Zoning and Development By-law No. 3575, **Section 2 Definitions** (`sources/zoning-by-law-section-2.pdf`) | June 2026 consolidation, 50 pp. | **Impermeable Materials** (p.20), **Permeable Materials** (p.31), Deck (p.11), Patio (p.30), Site (p.43) |
 | City of Vancouver open data | property parcel polygons (retrieved 2026-09-21), building footprints 2015 and 2009 (2026-09-25) | site outlines and areas, roof footprints, heights for the Rhino drawing only |
-| Rain City Strategy (2019) | Council policy, **not a by-law** | the 48 mm daily design standard in the storm card, as context |
+| City of Vancouver open data | 2013 digital elevation model; parks, community gardens, catch basins (2026) | the shaded relief, the 3D ground and the Water view; context only, in no compliance figure |
+| Rain City Strategy (2019) | Council policy, **not a by-law** | the 48 mm daily design standard in the storm card and the Rain City point, as context |
 
 Every passage is quoted verbatim, with its page, in
 [`sources/r1-1-impermeable-extract.md`](sources/r1-1-impermeable-extract.md),
@@ -128,21 +166,24 @@ map opens on it:
 
 Check by hand: 0.75 × 602.04 = 451.53; 451.53 − 237.22 = 214.31 m².
 
-Citywide, with the same hard landscaping added to each of the 62,188 assessed
-lots: 60 m² of concrete puts 157 lots over 75%; 90 m² puts 1,374 over; 120 m²
-puts 10,944 over. The same square metres of permeable pavers give exactly the
-same counts. Gravel leaves one lot over, whose roof alone exceeds 75%.
+Citywide, across all 62,144 assessed lots: at the 75% by-law maximum,
+62,143 lots fit (one lot's roofs alone are over 75%). At the Rain City point,
+39.8%, 42,556 lots fit, 68.5%: for the other 19,588, the roofs alone already
+cover more of the site than a lot can have and still keep a 48 mm rain day on
+site. Half the lots have roofs on 36.0% of the site or less. 787 assessed lots
+have no roof in the 2015 footprints and count as 0% roofs.
 
 **Input:** search `3528 W 30TH AV`; leave the example paving as it is.
 **Result:** PASS, 132.3 m² spare. The selected lot on the map shows the same
 split as its bar.
 
-![The map on 3528 W 30th Ave: the lot card reads PASS, 132.3 m² spare, with the bar marked at 50% and 75% and the example paving schedule; the lot is outlined with a dashed line on the map](output/map-3528-w-30th-ave.png)
+![The map on 3528 W 30th Ave: the lot card reads PASS, 132.3 m² spare, with the bar marked at 50% and 75% and the example paving schedule; the lot is outlined with a dashed line on the map, its neighbours in sand and slate](output/map-3528-w-30th-ave.png)
 
 The same lot in *Every lot* with the slider at the 75% by-law maximum:
-61,356 of 61,357 houses fit, and the purple tick is this lot's roofs at 39.4%.
+62,143 of 62,144 lots fit, the purple tick is this lot's roofs at 39.4%, and
+the blue mark is the Rain City point at 39.8%.
 
-![Every lot mode at 75%: the citywide map in red and blue, the slider at the by-law maximum, and 61,356 of 61,357 houses fit](output/map-every-lot-75.png)
+![Every lot mode at 75%: the citywide map in sand and slate over the shaded relief, the slider at the by-law maximum, 62,143 of 62,144 lots fit, the Rain City line at 39.8% and the roof-share histogram](output/map-every-lot-75.png)
 
 ![The same lot drawn by map/rhino_site.py in Rhino 8: the site with its 2015 roofs and the eave allowance, and the area bar marked at 50% and 75%](output/3528-w-30th-ave-map-plan.png)
 
@@ -194,7 +235,9 @@ against the source by hand.
   0.45 m eave allowance is taken off for the by-law test and both figures are
   shown. Measured to the roof edge 13,581 assessed sites read over 50%,
   measured to the walls, 769. The air photo cannot tell which is right for
-  any one house, so those 769 are marked *check*, not *exceedance*.
+  any one house, so those 769 are marked *check*, not *exceedance*. 787
+  assessed lots have no 2015 roof at all (empty, or between a teardown and a
+  new house, when the photo was taken); they count as 0% roofs.
 - **Driveways, patios and walks are in no City dataset.** The lot schedule
   and the slider are hypotheses you set, they are not a survey of existing
   paving. The page is not a compliance finding.
@@ -204,8 +247,9 @@ against the source by hand.
   Section 11 (s.2.2.4), which is not in this repository, the map counts them
   as buildings.
 - **A site is parcels sharing an address and an edge** (Section 2, Site).
-  Sites over 2,000 m², road allowances, parcels under 150 m² and parcels the
-  pipeline flagged are drawn grey and not assessed. Parcels below the 306 m²
+  Sites over 2,000 m², road allowances, parcels under 150 m², parcels the
+  pipeline flagged and park land with no building are hatched and not
+  assessed. Parcels below the 306 m²
   minimum site area of s.3.2.2.1 are assessed but labelled.
 - **Two readings are the author's**, and the page says so where it relies on
   them: the on-grade, no-impermeable-layer condition applied to every listed
@@ -213,9 +257,16 @@ against the source by hand.
   counted as wood, so impermeable.
 - **The split drawn inside each lot is a diagram**, a share of the lot's
   depth from the south edge, not where the surfaces are.
-- **The storm card is Rain City Strategy context**, not the by-law. The R1-1
-  schedule sets no retention requirement: 85% runoff and 75 mm of soil
-  storage are this page's assumptions.
+- **The storm card and the Rain City point are Rain City Strategy context**,
+  not the by-law. The R1-1 schedule sets no retention requirement: 85% runoff
+  and 75 mm of soil storage are this page's assumptions (they can be changed
+  on the page). "On site" means nothing reaches the storm sewer; the 15% of
+  rain on hard surfaces that does not run off stays where it falls.
+- **The relief and 3D ground are pictures** from the 2013 elevation model,
+  cut to the city boundary; no figure uses them. Outside the city the 3D
+  ground is invented, a smooth surface easing down to sea level.
+- **Colours are checked for colour blindness** (simulated protanopia,
+  deuteranopia and tritanopia), and *over 75%* is striped as well as purple.
 - It cannot know what the Director of Planning will accept as permeable.
 
 ## Reviews and revision
@@ -235,10 +286,17 @@ Peer reviews from class are GitHub issues on this repository.
 README.md                     you are here
 map/
   index.html                  THE TOOL: the map, one lot's card and schedule, the citywide slider
+  water.js                    the Water view: where rain goes once it leaves the lots
+  serve.py                    local web server for the map (python3 serve.py)
   rhino_site.py               draws any lot from the map's data in Rhino 8
   roof_walls.py               roof area to the walls per site -> data/roof-walls.json
+  park_lots.py                empty park land zoned R1-1, not assessed -> data/park-lots.json
+  terrain_tiles.py            shaded relief and 3D ground from the 2013 DEM -> data/relief/, data/terrain/
+  lot_ground.py               ground height under every lot corner, for 3D -> data/lot-ground.bin
+  water_layers.py             flow paths and low spots for the Water view -> data/water.json, ...
   check_data.py               smoke test of the data files; run by the Pages workflow
-  data/                       the published snapshot: lots.geojson, buildings.geojson, roof-walls.json
+  data/                       the published snapshot: lots, buildings, roofs to the walls, parks,
+                              gardens, catch basins, relief and terrain tiles, water
 buildings.py                  the pipeline: parcels -> sites, 2015 roofs clipped and summed
 stormwater.py                 Stage 1: finds the R1-1 parcels (and a citywide stormwater analysis)
 requirements.txt              pinned versions for the pipeline
