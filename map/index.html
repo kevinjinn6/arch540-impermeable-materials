@@ -370,6 +370,9 @@ WHERE THE DATA COMES FROM
   .hist-key .k.fit { width: 10px; height: 10px; border-radius: 2px; background: var(--impermeable); }
   .hist-key .k.rest { width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--impermeable) 28%, var(--surface)); }
   .hist-read { margin-top: 4px; min-height: 16px; color: var(--ink); }
+  /* The roofs' age, one line under each verdict; it opens Assumptions and limits. */
+  .roofage { display: block; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+  .roofage:hover { color: var(--accent); }
   #cityHint { margin: 8px 0 0; }
   .tag { display: inline-block; font-size: 12px; line-height: 16px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; margin-bottom: 6px; }
@@ -469,6 +472,7 @@ WHERE THE DATA COMES FROM
 
     <section id="modeCity" role="tabpanel" aria-labelledby="tabCity">
       <div id="cityHero" aria-live="polite"></div>
+      <button type="button" class="linkbtn caption roofage" data-notes>Roofs: 2015 air photo · newer buildings missing ›</button>
       <!-- The Rain City point: the share at which a lot keeps the storm on site. Not the by-law. -->
       <div class="rc" id="rc">
         <div id="rcLine"></div>
@@ -790,7 +794,7 @@ $("mapLegend").innerHTML = [
 ].map(([w, t, id]) => `<div${id ? ` id="${id}" hidden` : ""}>${w}${t}</div>`).join("") +
   `<div class="small"><span id="legendNote">Split drawn as a diagram</span><span id="roofsNote" hidden></span></div>`;
 $("notes").innerHTML = [
-  `Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.`,
+  `<span id="noteRoofs">Roofs are the City's 2015 air-photo footprints, clipped to each site; anything built since is missing. They trace the roof edge; the by-law measures walls, so ${EAVE_M} m is taken off for the test and both figures are shown.</span>`,
   `<span id="noteNoRoof">Every figure counts the same lots: every assessed R1-1 lot.</span>`,
   `A site is adjoining parcels with one address (${PASSAGES.site.ref}). Sites over 2,000 m², road allowances, parcels under ${NOT_A_SITE_M2} m², flagged parcels and park land with no building are hatched: not assessed.`,
   `s.3.2 uses only (house, duplex). A multiplex under s.3.1 has no impermeable limit. Laneway houses (Section 11, s.2.2.4, not checked) count here as buildings.`,
@@ -1286,7 +1290,12 @@ function lotFlags(p) {
   else if (p.A < BYLAW.min_site_area_m2) flags.push(`below the ${BYLAW.min_site_area_m2} m² minimum site area of s.3.2.2.1: an existing small lot, or part of a larger site`);
   return flags;
 }
-function openNotes() { $("bylaw").open = true; $("notes").scrollIntoView({ behavior: "smooth", block: "start" }); }
+function openNotes(id = "notes") {
+  if (panel.dataset.sheet === "peek" && innerWidth <= 560) panel.dataset.sheet = "full";
+  $("bylaw").open = true; $(id).scrollIntoView({ behavior: "smooth", block: "start" });
+}
+// "Roofs: 2015 air photo" beside each verdict opens the assumptions (the cards are rebuilt, so listen on the panel).
+panel.addEventListener("click", e => { if (e.target.closest("[data-notes]")) openNotes("noteRoofs"); });
 
 // The card's structure. Built when a lot is chosen or a surface is added, removed
 // or reclassified. The figures that change while typing are filled by renderLotTotals.
@@ -1306,7 +1315,7 @@ function renderLot() {
       `<p style="margin:8px 0 0">${cap(flags.join(". "))}.</p>` +
       `<div class="rows"><button type="button" class="row linkrow" id="whyGrey">Why some lots are hatched${CHEV}</button></div>`;
     el.innerHTML = html;
-    $("whyGrey").addEventListener("click", openNotes);
+    $("whyGrey").addEventListener("click", () => openNotes());
     state.lotResult = null; updateTick(null); renderChip(); renderPeek(); return;
   }
   const s = assess(p, 0, false);
@@ -1323,6 +1332,7 @@ function renderLot() {
     `<div class="ghost" id="barGhost" hidden><i>if pavers were permeable</i></div></div>`;
   // The verdict, then the passage it rests on, one tap away.
   html += `<div class="verdict" aria-live="polite"><span class="pill" id="pill"></span><b class="display" id="margin"></b></div>` +
+    `<button type="button" class="linkbtn caption roofage" data-notes>Roofs: 2015 air photo · newer buildings missing ›</button>` +
     `<details class="ref"><summary class="caption">${chip(shortRef(P75.ref))} · with the paving below</summary>${passage("s3228")}</details>`;
   // Three facts: the roofs, the 50% rule, the room.
   html += `<div class="facts">` +
