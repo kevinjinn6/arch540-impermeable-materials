@@ -77,6 +77,10 @@ WHERE THE DATA COMES FROM
                            demolition permit since 2017 (map/permits.py): their
                            2015 roofs may be out of date. A flag only; no
                            figure changes. Without the file there are no flags.
+  data/not-r11.geojson     the city's land outside R1-1 zoning (map/not_r11.py,
+                           from "local-area-boundary" and the zoning districts),
+                           drawn as a light grey wash so it reads as outside
+                           this study, not as missing data.
   data/gardens.geojson     community gardens ("Community gardens and food
                            trees", 2026-07-14): n name, pl plots. Sites with
                            food trees only are left out.
@@ -686,6 +690,9 @@ const PARKS_FILE = "data/parks.geojson";
 const PARK_LOTS_FILE = "data/park-lots.json";
 const PERMITS_FILE = "data/permits.json";     // new-building and demolition permits since 2017, per lot (map/permits.py)
 const GARDENS_FILE = "data/gardens.geojson";
+const NOT_R11_FILE = "data/not-r11.geojson";
+// Land outside R1-1: a light grey wash, so its blank streets read as "not in this study".
+const NOT_R11 = { color: "#c9c6bf", colorDark: "#000000", opacity: 0.5, opacityDark: 0.4 };
 const BASINS_FILE = "data/catch-basins.geojson";
 // The shaded relief: drawn by map/terrain_tiles.py from the 2013 DEM (lit from the northwest,
 // see-through shadow and highlight, so the lot colours still read through it) and cut to the
@@ -833,6 +840,7 @@ $("mapLegend").innerHTML = [
   [`<span class="swatch picked"></span>`, "Selected lot"],
   [`<span class="swatch hatch"></span>`, "Not assessed"],
   [`<span class="swatch" style="background:${dark ? COLOR.parkDark : COLOR.park};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Park"],
+  [`<span class="swatch" style="background:${dark ? NOT_R11.colorDark : NOT_R11.color};opacity:${dark ? 0.7 : 0.8}"></span>`, "Not R1-1"],
   [`<span class="swatch dot" style="background:${COLOR.garden};box-shadow:inset 0 0 0 1.5px ${COLOR.gardenEdge}"></span>`, "Community garden"],
   [`<span class="swatch dot small-dot" style="background:${dark ? COLOR.basinDark : COLOR.basin}"></span>`, "Catch basin"],
   [sw(dark ? VIEW_3D.assumedDark : VIEW_3D.assumed), "Height assumed", "legend3d"],     // 3D only
@@ -2130,6 +2138,10 @@ map.on("load", async () => {
      .forEach(l => map.setLayoutProperty(l.id, "visibility", "none"));
   const firstLabel = map.getStyle().layers.find(l => l.type === "symbol")?.id;
   state.lotLayer = lotLayer(buildLotMesh(data.features));
+  // Land outside R1-1, under the lots. MapLibre fetches the file itself; if it is missing, no wash.
+  map.addSource("not-r11", { type: "geojson", data: NOT_R11_FILE });
+  map.addLayer({ id: "not-r11", type: "fill", source: "not-r11",
+    paint: { "fill-color": dark ? NOT_R11.colorDark : NOT_R11.color, "fill-opacity": dark ? NOT_R11.opacityDark : NOT_R11.opacity } }, firstLabel);
   map.addLayer(state.lotLayer, firstLabel);
   map.addLayer({ id: "lot-hit-area", type: "fill", source: "lots", paint: { "fill-color": "#000", "fill-opacity": 0.02 } }, firstLabel);
   map.addLayer({ id: "lot-edges", type: "line", source: "lots", minzoom: 15,
