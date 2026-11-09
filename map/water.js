@@ -278,7 +278,7 @@ function lotsDrainingTo(net, place, counted) {
 const water = { on: false, loading: false, net: null, parks: [], frame: 0, last: null,
                 hours: STORMS.opening_h, years: STORMS.opening_years, climate: STORMS.opening_climate,
                 mode: "storm", fills: null, area: 0, streetArea: 0, moreOpen: false,
-                pick: null, route: [], spotCentre: new Map(), spotName: new Map(), spotLots: null, floodedLots: [] };
+                pick: null, route: [], spotCentre: new Map(), spotName: new Map(), spotLots: null, floodedLots: [], floodedShown: new Set() };
 const WATER_PATH = dark ? WATER.pathDark : WATER.path, WATER_SPOT = dark ? WATER.spotDark : WATER.spot;
 const WATER_ROUTE = dark ? WATER.routeDark : WATER.route;
 const FLOODED_LOT = dark ? WATER.flooded_lotDark : WATER.flooded_lot;
@@ -599,10 +599,27 @@ async function loadWater() {
     map.addLayer({ id: "water-catchment-edge", type: "line", source: "lots", minzoom: 14, filter: ["==", ["get", "k"], ""],
       paint: { "line-color": WATER_ROUTE, "line-width": 0.75, "line-opacity": 0.6 } }, "parks");
     // Lots under a flooded low spot's water (15 cm or more): red, with a red edge from street zoom.
-    map.addLayer({ id: "water-flooded-lots", type: "fill", source: "lots", filter: ["==", ["get", "k"], ""],
-      paint: { "fill-color": FLOODED_LOT, "fill-opacity": WATER.flooded_lot_opacity } }, "parks");
-    map.addLayer({ id: "water-flooded-lots-edge", type: "line", source: "lots", minzoom: 14, filter: ["==", ["get", "k"], ""],
-      paint: { "line-color": FLOODED_LOT, "line-width": 1.25 } }, "parks");
+    // Only assessed house lots: parks, golf courses and sites over 2,000 m2 are left out (a park
+    // holding water is what parks do here; its water shows as the blue low spot). The lots any
+    // low spot covers get a small source of their own, switched on and off by feature-state,
+    // so the red follows the slider while it is dragged (a filter on all 62,000 lots cannot).
+    if (water.spotLots) {
+      const idx = new Map(), feats = [];
+      for (const [u, keys] of Object.entries(water.spotLots)) {
+        water.spotLots[u] = keys.flatMap(k => {
+          const f = state.byKey.get(k);
+          if (!f || !f.properties.assessed) return [];
+          if (!idx.has(k)) { idx.set(k, feats.length); feats.push({ type: "Feature", id: feats.length, properties: {}, geometry: f.geometry }); }
+          return [idx.get(k)];
+        });
+      }
+      map.addSource("water-flooded-lots", { type: "geojson", data: { type: "FeatureCollection", features: feats } });
+      const on = ["boolean", ["feature-state", "f"], false];
+      map.addLayer({ id: "water-flooded-lots", type: "fill", source: "water-flooded-lots",
+        paint: { "fill-color": FLOODED_LOT, "fill-opacity": ["case", on, WATER.flooded_lot_opacity, 0] } }, "parks");
+      map.addLayer({ id: "water-flooded-lots-edge", type: "line", source: "water-flooded-lots", minzoom: 14,
+        paint: { "line-color": FLOODED_LOT, "line-width": 1.25, "line-opacity": ["case", on, 1, 0] } }, "parks");
+    }
     // Paths and low spots go above the relief and below the catch basins.
     map.addSource("water-spots", { type: "geojson", data: spots });
     map.addSource("water-paths", { type: "geojson", data: paths });
@@ -739,7 +756,7 @@ function updateWater() {
     const lots = new Set();
     for (let u = net.paths; u < net.down.length; u++) if (floods(net, inn, u)) {
       flooded++;
-      for (const k of (water.spotLots && water.spotLots[u]) || []) lots.add(k);
+      for (const i of (water.spotLots && water.spotLots[u]) || []) lots.add(i);
     }
     water.floodedLots = [...lots];
     water.last = { split, src, inn, out, held, total, flooded, toParks: toParksM3(net, out, src),
@@ -756,8 +773,13 @@ function updateWater() {
         map.setFeatureState({ source: "water-parks", id: p }, { m3: flood ? 0 : water.last.arrive.get(p) || 0 });
       map.getSource("water-park-points")?.setData(parkPoints());
       // The red lots: this storm's flooded low spots only (none in the "which storm" map).
-      const f = !flood && water.floodedLots.length ? ["in", ["get", "k"], ["literal", water.floodedLots]] : ["==", ["get", "k"], ""];
-      for (const id of ["water-flooded-lots", "water-flooded-lots-edge"]) if (map.getLayer(id)) map.setFilter(id, f);
+      // Only the lots that changed are touched.
+      if (map.getSource("water-flooded-lots")) {
+        const now = new Set(flood ? [] : water.floodedLots), was = water.floodedShown;
+        for (const i of was) if (!now.has(i)) map.setFeatureState({ source: "water-flooded-lots", id: i }, { f: false });
+        for (const i of now) if (!was.has(i)) map.setFeatureState({ source: "water-flooded-lots", id: i }, { f: true });
+        water.floodedShown = now;
+      }
       renderCard();
     }
     renderLotTotals();                        // the lot card's water line follows
