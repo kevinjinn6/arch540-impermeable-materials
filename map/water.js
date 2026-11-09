@@ -122,6 +122,9 @@ const WATER = {
   network_file: "data/water.json",
   paths_file: "data/flow-paths.geojson",
   spots_file: "data/low-spots.geojson",
+  spot_lots_file: "data/spot-lots.json",   // which lots each low spot covers (map/spot_lots.py); missing = no red lots
+  flooded_lot: "#d62828", flooded_lotDark: "#ff5c5c",   // a lot under a flooded low spot's water
+  flooded_lot_opacity: 0.55,
   veil: 0.3,              // how strongly the lots fade while Water is on (0 none, 1 hidden): light, so
                           // the sand and slate stay readable under the water
   path: "#0b4f9c", pathDark: "#9ad3ff",       // the water's paths (and a full low spot's outline)
@@ -133,6 +136,9 @@ const WATER = {
   catchment_opacity: 0.3,   // how strongly the lots draining to a picked place are tinted
   dry_paths: 0,           // how strongly a dry path is drawn: where water would run (0 = hidden)
   top: 3,                 // how many low spots and parks the card names
+  arrows_from_zoom: 13,   // arrows on the running water, pointing downhill, from this zoom in
+  park_label_from_zoom: 12,  // the m3 reaching each park is written from this zoom in
+  park_min_m3: 100,       // a park lights up (outline, circle, label) when at least this much water reaches it
 };
 // =============================================================================
 //  END OF CONFIGURATION
@@ -209,6 +215,17 @@ function parkArrivals(net, out, src) {
   }
   return got;
 }
+// m3 that reaches a park, counted once even if it runs through several: water that
+// starts in park land, plus water entering it from outside any park.
+function toParksM3(net, out, src) {
+  let t = 0;
+  for (let u = 0; u < net.down.length; u++) {
+    if (net.park[u] < 0) continue;
+    t += src[u];
+    for (const q of net.ups[u]) if (net.park[q] < 0) t += out[q];
+  }
+  return t;
+}
 // For each low spot, the smallest storm on the switches that fills it (its place in
 // STORMS.years, and its length), every lot at `hardShare`, with `climate`'s rain; -1 = none.
 function firstFills(net, hardShare, climate) {
@@ -261,9 +278,10 @@ function lotsDrainingTo(net, place, counted) {
 const water = { on: false, loading: false, net: null, parks: [], frame: 0, last: null,
                 hours: STORMS.opening_h, years: STORMS.opening_years, climate: STORMS.opening_climate,
                 mode: "storm", fills: null, area: 0, streetArea: 0, moreOpen: false,
-                pick: null, route: [], spotCentre: new Map(), spotName: new Map() };
+                pick: null, route: [], spotCentre: new Map(), spotName: new Map(), spotLots: null, floodedLots: [] };
 const WATER_PATH = dark ? WATER.pathDark : WATER.path, WATER_SPOT = dark ? WATER.spotDark : WATER.spot;
 const WATER_ROUTE = dark ? WATER.routeDark : WATER.route;
+const FLOODED_LOT = dark ? WATER.flooded_lotDark : WATER.flooded_lot;
 const nice = x => x >= 1e6 ? `${(x / 1e6).toFixed(1)} million` : x >= 1e5 ? `${(x / 1e3).toFixed(0)}k` : roundNice(x);   // 1.1 million, 449k, 2,600, 14
 const ha = m2 => `${(m2 / 1e4).toFixed(m2 < 1e5 ? 1 : 0)} ha`;
 const pctOf = share => `${Math.round(share * 100)}%`;
@@ -303,6 +321,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   .water-card .flood-key { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; margin: 10px 0 4px; text-align: center; font-variant-numeric: tabular-nums; }
   .water-card .flood-key i { display: block; height: 10px; border-radius: 2px; margin-bottom: 3px; }
   .water-card .flood-key b { display: block; font-weight: 600; color: var(--ink); font-size: 11px; } .water-card .flood-key span { font-size: 11px; }
+  .water-card .to-parks { margin: 8px 0 0; } .water-card .to-parks .water-bar { margin: 0 0 4px; }
   .water-card .hint button { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
   .water-card .water-bar { height: 10px; margin: 8px 0 4px; }
   .water-card .keys { display: flex; flex-wrap: wrap; gap: 2px 10px; }
@@ -336,14 +355,14 @@ function chartSvg() {
   const c = floodCurve(stormAt()), top = Math.max(10, Math.ceil(Math.max(...c) / 100) * 100);
   const y = n => CH.t + (1 - n / top) * (CH.H - CH.t - CH.b), base = y(0), now = state.hard;
   const pts = c.map((n, k) => `${chX(k / 100).toFixed(1)},${y(n).toFixed(1)}`);
-  return `<svg class="chart" viewBox="0 0 ${CH.W} ${CH.H}" role="img" aria-label="Places flooding against hard surface on every lot: ${c[0]} at 0%, ${c[50]} at 50%, ${c[Math.round(L * 100)]} at the ${pctOf(L)} limit, ${c[100]} at 100%.">` +
+  return `<svg class="chart" viewBox="0 0 ${CH.W} ${CH.H}" role="img" aria-label="Places flooding against hardscape on every lot: ${c[0]} at 0%, ${c[50]} at 50%, ${c[Math.round(L * 100)]} at the ${pctOf(L)} limit, ${c[100]} at 100%.">` +
     `<line x1="${CH.l}" x2="${chX(1)}" y1="${base}" y2="${base}" stroke="var(--rule)"></line>` +
     `<path d="M${chX(0)},${base}L${pts.join("L")}L${chX(1)},${base}Z" fill="${WATER_SPOT}" opacity="0.22"></path>` +
     `<path d="M${pts.join("L")}" fill="none" stroke="${WATER_PATH}" stroke-width="2" stroke-linejoin="round"></path>` +
     `<line x1="${chX(L)}" x2="${chX(L)}" y1="${CH.t}" y2="${base}" stroke="${OVER}" stroke-width="1.5" stroke-dasharray="3 3"></line>` +
     `<text x="${chX(L)}" y="${CH.t - 5}" text-anchor="middle">${pctOf(L)} limit</text>` +
     `<text x="${CH.l}" y="${CH.t - 5}">${top} places</text>` +
-    `<text x="${CH.l}" y="${CH.H - 2}">0% hard</text><text x="${chX(0.5)}" y="${CH.H - 2}" text-anchor="middle">50%</text>` +
+    `<text x="${CH.l}" y="${CH.H - 2}">0% hardscape</text><text x="${chX(0.5)}" y="${CH.H - 2}" text-anchor="middle">50%</text>` +
     `<text x="${chX(1)}" y="${CH.H - 2}" text-anchor="end">100%</text>` +
     `<line class="cross" x1="0" x2="0" y1="${CH.t}" y2="${base}" stroke="var(--ink-3)" visibility="hidden"></line>` +
     `<circle cx="${chX(now)}" cy="${y(water.last.flooded)}" r="4.5" fill="${WATER_PATH}" stroke="var(--surface)" stroke-width="2"></circle>` +
@@ -353,7 +372,7 @@ function readoutNow() {
   const c = floodCurve(stormAt()), k = Math.round(L * 100);
   return `At 50%: <b>${c[50]}</b> · at the ${pctOf(L)} limit: <b>${c[k]}</b>`;
 }
-const readoutAt = share => `At ${pctOf(share)} hard: <b>${floodCurve(stormAt())[Math.round(share * 100)]}</b> places flood`;
+const readoutAt = share => `At ${pctOf(share)} hardscape: <b>${floodCurve(stormAt())[Math.round(share * 100)]}</b> places flood`;
 
 // What the card and the hover say about one path or low spot.
 function describeNode(u) {
@@ -411,7 +430,7 @@ function renderCard() {
     const k10 = STORMS.years.findIndex(y => y >= 10), early = count.slice(0, k10 + 1).reduce((t, x) => t + x, 0);
     const never = K - count.reduce((t, x) => t + x, 0);
     top = `<h2>Water · which storm floods each place</h2>` +
-      `<div class="headline"><span class="big">${early}</span><span>places flood in a 1-in-${STORMS.years[k10]}-year storm or a more common one, with every lot ${pctOf(state.hard)} hard.</span></div>` +
+      `<div class="headline"><span class="big">${early}</span><span>places flood in a 1-in-${STORMS.years[k10]}-year storm or a more common one, with every lot ${pctOf(state.hard)} hardscape.</span></div>` +
       `<div class="flood-key" role="img" aria-label="${STORMS.years.map((y, k) => `1-in-${y}: ${count[k]}`).join(", ")}, none: ${never}">` +
         STORMS.years.map((y, k) => `<div><i style="background:${FLOOD[k]}"></i><b>${y} yr</b><span>${count[k]}</span></div>`).join("") +
         `<div><i style="background:var(--rule)"></i><b>none</b><span>${never}</span></div></div>` +
@@ -419,9 +438,13 @@ function renderCard() {
   } else {
     top = `<h2>Water · ${stormTitle()}</h2>` +
       `<div class="caption">${rain.toFixed(0)} mm in ${lengthText(h)}${!page && water.climate !== PIPES.curve ? ` with ${water.climate}'s rain` : ""}: ${meaning}.</div>` +
-      `<div class="headline"><span class="big">${r.flooded}</span><span>places flood 15 cm deep or more (the City's limit), with every lot ${pctOf(state.hard)} hard.</span></div>` +
+      `<div class="headline"><span class="big">${r.flooded}</span><span>places flood 15 cm deep or more (the City's limit), with every lot ${pctOf(state.hard)} hardscape.</span></div>` +
+      (water.spotLots ? `<div class="caption"><b>${water.floodedLots.length.toLocaleString()}</b> lots lie under that water (red).</div>` : "") +
       chartSvg() + `<div class="caption" id="waterReadout">${readoutNow()}</div>` +
-      `<div class="keys" style="margin-top:6px">${key(WATER_SPOT, "flooded 15 cm+")}${key(WATER_PATH, "water running downhill", true)}</div>`;
+      (r.total >= 1 ? `<div class="to-parks"><div class="water-bar" aria-hidden="true"><span style="width:${(r.toParks / r.total * 100).toFixed(1)}%;background:${COLOR.park}"></span></div>` +
+        `<div><b>${Math.round(r.toParks / r.total * 100)}%</b> of the water running downhill reaches a park: ${nice(r.toParks)} m³</div></div>` : "") +
+      `<div class="keys" style="margin-top:6px">${key(WATER_SPOT, "flooded 15 cm+")}${water.spotLots ? key(FLOODED_LOT, "lot under flood water") : ""}${key(WATER_PATH, "water running downhill ›", true)}` +
+        `<span><i class="swatch dot" style="background:transparent;box-shadow:inset 0 0 0 2px ${WATER_PATH}"></i>water reaching a park</span></div>`;
   }
 
   // Everything else, folded away.
@@ -443,7 +466,7 @@ function renderCard() {
       (map.getLayer("water-contours") ? key(CONTOUR, "contour, in m", true) : "") +
       (water.route.length ? key(WATER_ROUTE, "this lot's way down", true) : "") + `</div>` +
     `<h3>How it's worked out</h3><dl>` +
-      `<dt>Lots</dt><dd>soil holds ${Math.round(STORM.soil_mm)} mm; ${Math.round(STORM.runoff * 100)}% of the rain on hard surfaces runs off onto it (this page's)</dd>` +
+      `<dt>Lots</dt><dd>soil holds ${Math.round(STORM.soil_mm)} mm; ${Math.round(STORM.runoff * 100)}% of the rain on hardscape runs off onto it (this page's)</dd>` +
       (net.s ? `<dt>Streets</dt><dd>${streetKm2} km² in R1-1 zoning, ${Math.round(STREETS.runoff * 100)}% runoff` + (STREETS.pipes === "shared" ? ", sharing the pipes with the lots" : "") + `</dd>` : "") +
       `<dt>Pipes</dt><dd>take the 1-in-${PIPES.return_years}-year rain × ${PIPES.design_runoff} (Engineering Design Manual 2026, pp.133–136)</dd>` +
       `<dt>Places</dt><dd>low spots in the 2013 ground; flooded when water reaches ${net.settings.pond_cap_m * 100} cm (pp.151, 183)</dd>` +
@@ -514,6 +537,27 @@ function setRoute(nodes) {
   for (const u of nodes) map.setFeatureState({ source: src(u), id: u }, { route: true });
 }
 
+// A small chevron pointing along the line, in the water's colour with a light edge.
+function arrowImage() {
+  const c = document.createElement("canvas"); c.width = c.height = 32;
+  const g = c.getContext("2d");
+  g.lineCap = "round"; g.lineJoin = "round";
+  for (const [w, col] of [[9, dark ? "#1a1a19" : "#fcfcfb"], [4.5, WATER_PATH]]) {
+    g.strokeStyle = col; g.lineWidth = w;
+    g.beginPath(); g.moveTo(10, 6); g.lineTo(21, 16); g.lineTo(10, 26); g.stroke();
+  }
+  return g.getImageData(0, 0, 32, 32);
+}
+// The parks' circles: where the water arrives, with the m3 reaching each in this storm.
+function parkPoints() {
+  const arrive = water.mode === "flood" || !water.last ? new Map() : water.last.arrive;
+  return { type: "FeatureCollection", features: water.parks.map((q, p) => {
+    const m3 = arrive.get(p) || 0;
+    return { type: "Feature", id: p, properties: { m3, label: m3 >= 1 ? `${nice(m3)} m³` : "" },
+             geometry: { type: "Point", coordinates: water.parkPoint[p] } };
+  }) };
+}
+
 // ---- The layers -----------------------------------------------------------------
 async function loadWater() {
   water.loading = true; renderCard();
@@ -524,12 +568,26 @@ async function loadWater() {
     net.ups = net.down.map(() => []);
     net.down.forEach((d, u) => { if (d >= 0) net.ups[d].push(u); });
     net.parkCount = parks.features.length;
+    // Optional: without it the map simply has no red lots.
+    water.spotLots = await fetch(WATER.spot_lots_file).then(r => r.ok ? r.json() : null).catch(() => null);
     water.parks = parks.features.map(f => ({ n: f.properties.n, c: featureCenter(f) }));
     for (const f of spots.features) water.spotCentre.set(f.id, featureCenter(f));
+    const pathEnd = new Map(paths.features.map(f => [f.id, f.geometry.coordinates[f.geometry.coordinates.length - 1]]));
     water.drained = drainedArea(net, "a");
     water.drainedStreets = drainedArea(net, "s");
     water.streetArea = net.s ? net.s.reduce((t, x) => t + x, 0) : 0;
-    water.area = net.a.reduce((t, x) => t + x, 0) + water.streetArea;   // what the chart averages over
+    water.area = net.a.reduce((t, x) => t + x, 0) + water.streetArea;
+    // Where to draw each park's circle: where the most water enters it (the path or low spot
+    // inside it that drains the most ground), else the middle of its outline.
+    const best = new Map();
+    for (let u = 0; u < net.down.length; u++) {
+      const p = net.park[u], w = water.drained[u] + water.drainedStreets[u];
+      if (p >= 0 && (!best.has(p) || w > best.get(p)[1])) best.set(p, [u, w]);
+    }
+    water.parkPoint = water.parks.map((q, p) => {
+      const u = best.has(p) ? best.get(p)[0] : -1;
+      return u < 0 ? q.c : u < net.paths ? pathEnd.get(u) || q.c : water.spotCentre.get(u) || q.c;
+    });
     water.net = net;
     // A veil over the lots (and the basemap under them), below the parks, so the water reads.
     map.addLayer({ id: "water-veil", type: "background",
@@ -540,6 +598,11 @@ async function loadWater() {
       paint: { "fill-color": WATER_ROUTE, "fill-opacity": WATER.catchment_opacity } }, "parks");
     map.addLayer({ id: "water-catchment-edge", type: "line", source: "lots", minzoom: 14, filter: ["==", ["get", "k"], ""],
       paint: { "line-color": WATER_ROUTE, "line-width": 0.75, "line-opacity": 0.6 } }, "parks");
+    // Lots under a flooded low spot's water (15 cm or more): red, with a red edge from street zoom.
+    map.addLayer({ id: "water-flooded-lots", type: "fill", source: "lots", filter: ["==", ["get", "k"], ""],
+      paint: { "fill-color": FLOODED_LOT, "fill-opacity": WATER.flooded_lot_opacity } }, "parks");
+    map.addLayer({ id: "water-flooded-lots-edge", type: "line", source: "lots", minzoom: 14, filter: ["==", ["get", "k"], ""],
+      paint: { "line-color": FLOODED_LOT, "line-width": 1.25 } }, "parks");
     // Paths and low spots go above the relief and below the catch basins.
     map.addSource("water-spots", { type: "geojson", data: spots });
     map.addSource("water-paths", { type: "geojson", data: paths });
@@ -568,6 +631,29 @@ async function loadWater() {
       layout: { "line-join": "round", "line-cap": "round" },
       paint: { "line-color": WATER_ROUTE, "line-opacity": ["case", onRoute, 1, 0],
                "line-width": ["interpolate", ["linear"], ["zoom"], 11, 2, 17, 4] } }, "basins");
+    // Arrows along the running water, pointing downhill (each path's line runs uphill to downhill).
+    map.addImage("water-arrow", arrowImage(), { pixelRatio: 2 });
+    map.addLayer({ id: "water-arrows", type: "symbol", source: "water-paths", minzoom: WATER.arrows_from_zoom,
+      layout: { "symbol-placement": "line", "symbol-spacing": 90, "icon-image": "water-arrow", "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.8, 17, 1.3],
+                "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true },
+      paint: { "icon-opacity": ["case", [">", q, 0.5], 1, 0] } }, "basins");
+    // Parks the water reaches: a blue outline, and a ring where it arrives, sized by the m3. Only
+    // an outline (no fill), so it reads as water arriving, not as a flooded low spot (Kevin, 2026-11-09).
+    map.addSource("water-parks", { type: "geojson", data: { type: "FeatureCollection",
+      features: parks.features.map((f, i) => ({ type: "Feature", id: i, properties: {}, geometry: f.geometry })) } });
+    map.addSource("water-park-points", { type: "geojson", data: parkPoints() });
+    const got = ["coalesce", ["feature-state", "m3"], 0];
+    map.addLayer({ id: "water-park-edge", type: "line", source: "water-parks",
+      paint: { "line-color": WATER_PATH, "line-width": 2, "line-opacity": ["case", [">=", got, WATER.park_min_m3], 0.9, 0] } }, "basins");
+    map.addLayer({ id: "water-park-circles", type: "circle", source: "water-park-points", filter: [">=", ["get", "m3"], WATER.park_min_m3],
+      paint: { "circle-color": WATER_SPOT, "circle-opacity": 0, "circle-stroke-color": WATER_PATH, "circle-stroke-width": 2,
+               // the circle's area follows the water: 1,000 m3 about 6 px across the middle, 100,000 m3 about 28 px
+               "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "m3"]], 0, 2, 32, 6, 100, 12, 316, 28] } });
+    map.addLayer({ id: "water-park-labels", type: "symbol", source: "water-park-points", minzoom: WATER.park_label_from_zoom,
+      filter: [">=", ["get", "m3"], WATER.park_min_m3],
+      layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 11,
+                "text-offset": [0, 1.4], "text-anchor": "top" },
+      paint: { "text-color": WATER_PATH, "text-halo-color": dark ? "#1a1a19" : "#fcfcfb", "text-halo-width": 1.5 } });
     setWaterVisible(water.on);
     updateWater();
     loadContours();                           // on its own: the water works without it
@@ -612,10 +698,17 @@ async function loadContours() {
   }
 }
 
-const WATER_LAYERS = ["water-veil", "water-catchment", "water-catchment-edge", "water-contours", "water-contour-labels",
-                      "water-spots", "water-spots-edge", "water-paths-casing", "water-paths", "water-route"];
+const WATER_LAYERS = ["water-veil", "water-catchment", "water-catchment-edge", "water-flooded-lots", "water-flooded-lots-edge", "water-contours", "water-contour-labels",
+                      "water-spots", "water-spots-edge", "water-paths-casing", "water-paths", "water-route", "water-arrows",
+                      "water-park-edge", "water-park-circles", "water-park-labels"];
+// The roof checks (amber rings and numbered circles) are hidden while Water is on: they are not
+// about water, and their numbers read as flood counts (Kevin, 2026-11-08).
+const CHECK_LAYERS = ["check-50-casing", "check-50", "check-clusters", "check-cluster-counts", "check-single"];
 function setWaterVisible(on) {
   for (const id of WATER_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+  for (const id of CHECK_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "none" : "visible");
+  const row = document.querySelector("#mapLegend .checkdot")?.parentElement;   // and its legend row
+  if (row) row.hidden = on;
 }
 
 // "storm": this storm's water. "flood": each low spot coloured by the smallest storm that fills it.
@@ -643,8 +736,14 @@ function updateWater() {
     let held = 0, total = 0;
     for (let u = 0; u < net.down.length; u++) { total += src[u]; if (u >= net.paths) held += inn[u] - out[u]; }
     let flooded = 0;
-    for (let u = net.paths; u < net.down.length; u++) if (floods(net, inn, u)) flooded++;
-    water.last = { split, src, inn, out, held, total, flooded, arrive: new Map(parkArrivals(net, out, src).entries()) };
+    const lots = new Set();
+    for (let u = net.paths; u < net.down.length; u++) if (floods(net, inn, u)) {
+      flooded++;
+      for (const k of (water.spotLots && water.spotLots[u]) || []) lots.add(k);
+    }
+    water.floodedLots = [...lots];
+    water.last = { split, src, inn, out, held, total, flooded, toParks: toParksM3(net, out, src),
+                   arrive: new Map(parkArrivals(net, out, src).entries()) };
     const flood = water.mode === "flood";
     if (flood) water.fills = firstFills(net, state.hard, water.climate);
     if (water.on) {
@@ -653,6 +752,12 @@ function updateWater() {
       for (let k = net.paths; k < net.down.length; k++)
         map.setFeatureState({ source: "water-spots", id: k }, flood ? { first: water.fills.size[k], spill: false }
           : { first: -1, spill: floods(net, inn, k) });
+      for (let p = 0; p < water.parks.length; p++)
+        map.setFeatureState({ source: "water-parks", id: p }, { m3: flood ? 0 : water.last.arrive.get(p) || 0 });
+      map.getSource("water-park-points")?.setData(parkPoints());
+      // The red lots: this storm's flooded low spots only (none in the "which storm" map).
+      const f = !flood && water.floodedLots.length ? ["in", ["get", "k"], ["literal", water.floodedLots]] : ["==", ["get", "k"], ""];
+      for (const id of ["water-flooded-lots", "water-flooded-lots-edge"]) if (map.getLayer(id)) map.setFilter(id, f);
       renderCard();
     }
     renderLotTotals();                        // the lot card's water line follows
